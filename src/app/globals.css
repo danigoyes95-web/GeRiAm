@@ -1,0 +1,285 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ─────────────────────────────────────────────────────────────────────────
+   GeRiAm · Sistema de diseño "sala de control"
+   Los colores de ALERTA son semánticos: úsalos solo para estado.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #070d18;
+  --bg-elevated: #0a1322;
+  --surface-1: #0d1829;
+  --surface-2: #112033;
+  --surface-3: #16283f;
+  --surface-hover: #1a2e48;
+  --border: #1c2c44;
+  --border-strong: #27395a;
+  --fg: #e6edf7;
+  --fg-muted: #93a3bd;
+  --fg-faint: #5d6e8a;
+  --accent: #22d3ee;
+  --accent-strong: #06b6d4;
+  --accent-soft: rgba(34, 211, 238, 0.12);
+  --data-2: #818cf8;
+  --data-3: #38bdf8;
+  --data-4: #a3e635;
+  --ring: rgba(34, 211, 238, 0.55);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --grid-line: rgba(147, 163, 189, 0.08);
+
+  --lvl-normal: #22c55e;
+  --lvl-amarilla: #facc15;
+  --lvl-naranja: #fb923c;
+  --lvl-roja: #ef4444;
+  --lvl-sin-datos: #64748b;
+  --lvl-offline: #a78bfa;
+
+  --lvl-normal-bg: rgba(34, 197, 94, 0.12);
+  --lvl-amarilla-bg: rgba(250, 204, 21, 0.13);
+  --lvl-naranja-bg: rgba(251, 146, 60, 0.14);
+  --lvl-roja-bg: rgba(239, 68, 68, 0.16);
+  --lvl-sin-datos-bg: rgba(100, 116, 139, 0.16);
+  --lvl-offline-bg: rgba(167, 139, 250, 0.14);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef2f8;
+  --bg-elevated: #f6f8fc;
+  --surface-1: #ffffff;
+  --surface-2: #f5f7fb;
+  --surface-3: #eaeff7;
+  --surface-hover: #e3e9f3;
+  --border: #dbe2ee;
+  --border-strong: #c3cfe1;
+  --fg: #0b1526;
+  --fg-muted: #4a5b78;
+  --fg-faint: #7d8ba3;
+  --accent: #0891b2;
+  --accent-strong: #0e7490;
+  --accent-soft: rgba(8, 145, 178, 0.1);
+  --data-2: #6366f1;
+  --data-3: #0284c7;
+  --data-4: #65a30d;
+  --ring: rgba(8, 145, 178, 0.5);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px -16px rgba(15, 23, 42, 0.25);
+  --grid-line: rgba(74, 91, 120, 0.08);
+
+  --lvl-normal: #16a34a;
+  --lvl-amarilla: #ca8a04;
+  --lvl-naranja: #ea580c;
+  --lvl-roja: #dc2626;
+  --lvl-sin-datos: #64748b;
+  --lvl-offline: #7c3aed;
+
+  --lvl-normal-bg: rgba(22, 163, 74, 0.1);
+  --lvl-amarilla-bg: rgba(202, 138, 4, 0.12);
+  --lvl-naranja-bg: rgba(234, 88, 12, 0.1);
+  --lvl-roja-bg: rgba(220, 38, 38, 0.1);
+  --lvl-sin-datos-bg: rgba(100, 116, 139, 0.12);
+  --lvl-offline-bg: rgba(124, 58, 237, 0.1);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-data-2: var(--data-2);
+  --color-data-3: var(--data-3);
+  --color-data-4: var(--data-4);
+
+  --color-lvl-normal: var(--lvl-normal);
+  --color-lvl-amarilla: var(--lvl-amarilla);
+  --color-lvl-naranja: var(--lvl-naranja);
+  --color-lvl-roja: var(--lvl-roja);
+  --color-lvl-sin-datos: var(--lvl-sin-datos);
+  --color-lvl-offline: var(--lvl-offline);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --shadow-panel: var(--shadow);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: "tnum", "zero";
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .bg-grid {
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+  }
+  .hairline {
+    border-color: var(--border);
+  }
+  .label-caps {
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--fg-faint);
+  }
+}
+
+/* Animaciones de estado (respetan prefers-reduced-motion) */
+@keyframes geriam-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes geriam-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes geriam-noise {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-2%, 1%);
+  }
+  50% {
+    transform: translate(1%, -2%);
+  }
+  75% {
+    transform: translate(-1%, 2%);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+@keyframes geriam-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes geriam-stripes {
+  to {
+    background-position: 40px 0;
+  }
+}
+.animate-pulse-soft {
+  animation: geriam-pulse 1.6s ease-in-out infinite;
+}
+.animate-ring {
+  animation: geriam-ring 1.8s ease-out infinite;
+}
+.animate-flow {
+  stroke-dasharray: 6 6;
+  animation: geriam-flow 1s linear infinite;
+}
+.drill-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(0, 0, 0, 0.18) 0 10px,
+    transparent 10px 20px
+  );
+  background-size: 40px 40px;
+  animation: geriam-stripes 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Mapbox: integrar controles con el tema */
+.mapboxgl-ctrl-group {
+  background: var(--surface-1) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow) !important;
+}
+.mapboxgl-ctrl-group button + button {
+  border-top-color: var(--border) !important;
+}
+[data-theme="dark"] .mapboxgl-ctrl-icon {
+  filter: invert(1) hue-rotate(180deg);
+}
+.mapboxgl-ctrl-attrib {
+  font-size: 10px;
+}
+.mapboxgl-popup-content {
+  background: var(--surface-1) !important;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px !important;
+  padding: 10px 12px !important;
+  box-shadow: var(--shadow) !important;
+}
+.mapboxgl-popup-tip {
+  display: none;
+}
