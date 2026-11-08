@@ -126,7 +126,7 @@ on conflict (site_id, point_id) do update set distancia_km = excluded.distancia_
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-NIV-01', 'Radar de nivel — torre de toma', 'nivel_radar', '70B3D57ED001IV01', 'm s. n. m.', 2, -1.2080073769602258, -78.8096910422641, 'Torre de toma, sobre el espejo',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-NIV-01', 'Radar de nivel — torre de toma', 'nivel_radar', '70B3D57ED0010001', 'm s. n. m.', 2, -1.2080073769602258, -78.8096910422641, 'Torre de toma, sobre el espejo',
   88, -96, 6.5, 60, '{"direction":"asc","amarilla":3742.8,"naranja":3743.4,"roja":3744.9,"hysteresis":0.05}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -134,7 +134,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-PLU-01', 'Pluviómetro de balancín', 'pluviometro', '70B3D57ED001LU01', 'mm', 1, -1.203954, -78.808272, 'Orilla, caseta meteorológica',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-PLU-01', 'Pluviómetro de balancín', 'pluviometro', '70B3D57ED0010002', 'mm', 1, -1.203954, -78.808272, 'Orilla, caseta meteorológica',
   76, -104, 3.2, 60, '{"direction":"asc","amarilla":10,"naranja":20,"roja":35,"hysteresis":2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -142,7 +142,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-QIN-01', 'Caudal de entrada — quebrada principal', 'caudal_entrada', '70B3D57ED001IN01', 'L/s', 0, -1.2001, -78.8001, 'Estación de aforo, cola del embalse',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-QIN-01', 'Caudal de entrada — quebrada principal', 'caudal_entrada', '70B3D57ED0010003', 'L/s', 0, -1.2001, -78.8001, 'Estación de aforo, cola del embalse',
   64, -112, -1.5, 60, '{"direction":"asc","amarilla":1500,"naranja":3000,"roja":6000,"hysteresis":30}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -150,7 +150,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-QOUT-01', 'Caudal de salida — descarga de fondo + vertedero', 'caudal_salida', '70B3D57ED001UT01', 'L/s', 0, -1.2093639345596614, -78.81067940442053, 'Canal de descarga al pie de presa',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-QOUT-01', 'Caudal de salida — descarga de fondo + vertedero', 'caudal_salida', '70B3D57ED0010004', 'L/s', 0, -1.2093639345596614, -78.81067940442053, 'Canal de descarga al pie de presa',
   91, -92, 7.8, 60, '{}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -158,7 +158,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-PZ-01', 'Piezómetro cuerpo de presa', 'piezometro', '70B3D57ED001PZ01', 'kPa', 1, -1.208504781413352, -78.81018522334232, 'Cuerpo de presa, eje central',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-PZ-01', 'Piezómetro cuerpo de presa', 'piezometro', '70B3D57ED0010005', 'kPa', 1, -1.208504781413352, -78.81018522334232, 'Cuerpo de presa, eje central',
   82, -88, 9.1, 300, '{"direction":"asc","amarilla":150,"naranja":162,"roja":175,"hysteresis":2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -166,7 +166,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-PZ-02', 'Piezómetro cimentación', 'piezometro', '70B3D57ED001PZ02', 'kPa', 1, -1.2086223497386366, -78.81054462776282, 'Cimentación, estribo izquierdo',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-PZ-02', 'Piezómetro cimentación', 'piezometro', '70B3D57ED0010006', 'kPa', 1, -1.2086223497386366, -78.81054462776282, 'Cimentación, estribo izquierdo',
   79, -90, 8.4, 300, '{"direction":"asc","amarilla":215,"naranja":228,"roja":242,"hysteresis":2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -174,7 +174,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-AS-01', 'Placa de asentamiento — cresta', 'asentamiento', '70B3D57ED001AS01', 'mm', 2, -1.20855, -78.80996059557948, 'Cresta, progresiva 0+080',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-AS-01', 'Placa de asentamiento — cresta', 'asentamiento', '70B3D57ED0010007', 'mm', 2, -1.20855, -78.80996059557948, 'Cresta, progresiva 0+080',
   93, -86, 9.6, 600, '{"direction":"asc","amarilla":15,"naranja":18,"roja":22,"hysteresis":0.3}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -182,7 +182,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-IN-01', 'Inclinómetro talud aguas abajo', 'inclinometro', '70B3D57ED001IN01', 'mm', 2, -1.2088213115198871, -78.81023014889487, 'Talud aguas abajo, berma 1',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-IN-01', 'Inclinómetro talud aguas abajo', 'inclinometro', '70B3D57ED0010008', 'mm', 2, -1.2088213115198871, -78.81023014889487, 'Talud aguas abajo, berma 1',
   87, -91, 7.2, 600, '{"direction":"asc","amarilla":5,"naranja":7,"roja":10,"hysteresis":0.2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -190,7 +190,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-RIO-01', 'Nivel de río al pie de presa', 'nivel_rio', '70B3D57ED001IO01', 'm', 2, -1.2109013665056885, -78.81139821326155, 'Cauce, 300 m aguas abajo',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-RIO-01', 'Nivel de río al pie de presa', 'nivel_rio', '70B3D57ED0010009', 'm', 2, -1.2109013665056885, -78.81139821326155, 'Cauce, 300 m aguas abajo',
   71, -108, 0.8, 60, '{"direction":"asc","amarilla":1.2,"naranja":1.8,"roja":2.6,"hysteresis":0.05}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -198,7 +198,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-UPS-01', 'Energía — UPS y banco solar', 'energia_ups', '70B3D57ED001PS01', '%', 0, -1.2089117486931829, -78.8109489577359, 'Caseta de control',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-UPS-01', 'Energía — UPS y banco solar', 'energia_ups', '70B3D57ED001000A', '%', 0, -1.2089117486931829, -78.8109489577359, 'Caseta de control',
   100, -78, 11.2, 300, '{"direction":"desc","amarilla":40,"naranja":25,"roja":10,"hysteresis":3}'::jsonb, 'activo', 'simulado',
   '{"enlace":"cableado al gateway","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -206,7 +206,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-STL-01', 'Enlace Starlink — latencia', 'starlink', '70B3D57ED001TL01', 'ms', 0, -1.208929836127842, -78.81098489817796, 'Mástil de la caseta de control',
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B01'), 'CHQ-STL-01', 'Enlace Starlink — latencia', 'starlink', '70B3D57ED001000B', 'ms', 0, -1.208929836127842, -78.81098489817796, 'Mástil de la caseta de control',
   100, -70, 12, 60, '{"direction":"asc","amarilla":150,"naranja":400,"hysteresis":20}'::jsonb, 'activo', 'simulado',
   '{"enlace":"cableado al gateway","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -291,7 +291,7 @@ on conflict (site_id, point_id) do update set distancia_km = excluded.distancia_
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-NIV-01', 'Radar de nivel — torre de toma', 'nivel_radar', '70B3D57ED002IV01', 'm s. n. m.', 2, -1.1952073769602258, -78.82709104521264, 'Torre de toma, sobre el espejo',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-NIV-01', 'Radar de nivel — torre de toma', 'nivel_radar', '70B3D57ED0020001', 'm s. n. m.', 2, -1.1952073769602258, -78.82709104521264, 'Torre de toma, sobre el espejo',
   88, -96, 6.5, 60, '{"direction":"asc","amarilla":3828.8,"naranja":3829.4,"roja":3830.4,"hysteresis":0.05}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -299,7 +299,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-PLU-01', 'Pluviómetro de balancín', 'pluviometro', '70B3D57ED002LU01', 'mm', 1, -1.1895749999999998, -78.828047, 'Orilla, caseta meteorológica',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-PLU-01', 'Pluviómetro de balancín', 'pluviometro', '70B3D57ED0020002', 'mm', 1, -1.1895749999999998, -78.828047, 'Orilla, caseta meteorológica',
   76, -104, 3.2, 60, '{"direction":"asc","amarilla":10,"naranja":20,"roja":35,"hysteresis":2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -307,7 +307,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-QIN-01', 'Caudal de entrada — quebrada principal', 'caudal_entrada', '70B3D57ED002IN01', 'L/s', 0, -1.1846, -78.8228, 'Estación de aforo, cola del embalse',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-QIN-01', 'Caudal de entrada — quebrada principal', 'caudal_entrada', '70B3D57ED0020003', 'L/s', 0, -1.1846, -78.8228, 'Estación de aforo, cola del embalse',
   64, -112, -1.5, 60, '{"direction":"asc","amarilla":1250,"naranja":2500,"roja":5000,"hysteresis":25}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -315,7 +315,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-QOUT-01', 'Caudal de salida — descarga de fondo + vertedero', 'caudal_salida', '70B3D57ED002UT01', 'L/s', 0, -1.1965639345596615, -78.82807940273564, 'Canal de descarga al pie de presa',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-QOUT-01', 'Caudal de salida — descarga de fondo + vertedero', 'caudal_salida', '70B3D57ED0020004', 'L/s', 0, -1.1965639345596615, -78.82807940273564, 'Canal de descarga al pie de presa',
   91, -92, 7.8, 60, '{}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -323,7 +323,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-PZ-01', 'Piezómetro cuerpo de presa', 'piezometro', '70B3D57ED002PZ01', 'kPa', 1, -1.1957047814133521, -78.82758522397414, 'Cuerpo de presa, eje central',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-PZ-01', 'Piezómetro cuerpo de presa', 'piezometro', '70B3D57ED0020005', 'kPa', 1, -1.1957047814133521, -78.82758522397414, 'Cuerpo de presa, eje central',
   82, -88, 9.1, 300, '{"direction":"asc","amarilla":150,"naranja":162,"roja":175,"hysteresis":2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -331,7 +331,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-PZ-02', 'Piezómetro cimentación', 'piezometro', '70B3D57ED002PZ02', 'kPa', 1, -1.1958223497386367, -78.82794462670977, 'Cimentación, estribo izquierdo',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-PZ-02', 'Piezómetro cimentación', 'piezometro', '70B3D57ED0020006', 'kPa', 1, -1.1958223497386367, -78.82794462670977, 'Cimentación, estribo izquierdo',
   79, -90, 8.4, 300, '{"direction":"asc","amarilla":215,"naranja":228,"roja":242,"hysteresis":2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -339,7 +339,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-AS-01', 'Placa de asentamiento — cresta', 'asentamiento', '70B3D57ED002AS01', 'mm', 2, -1.19575, -78.82736059726436, 'Cresta, progresiva 0+080',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-AS-01', 'Placa de asentamiento — cresta', 'asentamiento', '70B3D57ED0020007', 'mm', 2, -1.19575, -78.82736059726436, 'Cresta, progresiva 0+080',
   93, -86, 9.6, 600, '{"direction":"asc","amarilla":15,"naranja":18,"roja":22,"hysteresis":0.3}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -347,7 +347,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-IN-01', 'Inclinómetro talud aguas abajo', 'inclinometro', '70B3D57ED002IN01', 'mm', 2, -1.1960213115198872, -78.8276301493161, 'Talud aguas abajo, berma 1',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-IN-01', 'Inclinómetro talud aguas abajo', 'inclinometro', '70B3D57ED0020008', 'mm', 2, -1.1960213115198872, -78.8276301493161, 'Talud aguas abajo, berma 1',
   87, -91, 7.2, 600, '{"direction":"asc","amarilla":5,"naranja":7,"roja":10,"hysteresis":0.2}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -355,7 +355,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-RIO-01', 'Nivel de río al pie de presa', 'nivel_rio', '70B3D57ED002IO01', 'm', 2, -1.1981013665056885, -78.8287982082069, 'Cauce, 300 m aguas abajo',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-RIO-01', 'Nivel de río al pie de presa', 'nivel_rio', '70B3D57ED0020009', 'm', 2, -1.1981013665056885, -78.8287982082069, 'Cauce, 300 m aguas abajo',
   71, -108, 0.8, 60, '{"direction":"asc","amarilla":1.2,"naranja":1.8,"roja":2.6,"hysteresis":0.05}'::jsonb, 'activo', 'simulado',
   '{"enlace":"LoRaWAN","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -363,7 +363,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-UPS-01', 'Energía — UPS y banco solar', 'energia_ups', '70B3D57ED002PS01', '%', 0, -1.196111748693183, -78.82834895478736, 'Caseta de control',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-UPS-01', 'Energía — UPS y banco solar', 'energia_ups', '70B3D57ED002000A', '%', 0, -1.196111748693183, -78.82834895478736, 'Caseta de control',
   100, -78, 11.2, 300, '{"direction":"desc","amarilla":40,"naranja":25,"roja":10,"hysteresis":3}'::jsonb, 'activo', 'simulado',
   '{"enlace":"cableado al gateway","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
@@ -371,7 +371,7 @@ on conflict (organization_id, code) do update set name = excluded.name, unit = e
 
 insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-STL-01', 'Enlace Starlink — latencia', 'starlink', '70B3D57ED002TL01', 'ms', 0, -1.196129836127842, -78.82838489506092, 'Mástil de la caseta de control',
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), (select id from geriam.gateways where eui = 'A84041FFFF1A2B02'), 'MLC-STL-01', 'Enlace Starlink — latencia', 'starlink', '70B3D57ED002000B', 'ms', 0, -1.196129836127842, -78.82838489506092, 'Mástil de la caseta de control',
   100, -70, 12, 60, '{"direction":"asc","amarilla":150,"naranja":400,"hysteresis":20}'::jsonb, 'activo', 'simulado',
   '{"enlace":"cableado al gateway","downstream_point":null}'::jsonb)
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,

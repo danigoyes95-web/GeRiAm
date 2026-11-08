@@ -41,7 +41,6 @@ const run = (step: string) => !only || only.has(step);
 
 function ok<T>(r: { data: T; error: { message: string } | null }, what: string): NonNullable<T> {
   if (r.error) throw new Error(`${what}: ${r.error.message}`);
-  if (r.data === null || r.data === undefined) throw new Error(`${what}: sin datos`);
   return r.data as NonNullable<T>;
 }
 
@@ -152,7 +151,7 @@ async function seed() {
         "route",
       );
     }
-    for (const se of s.sensors) {
+    for (const [idx, se] of s.sensors.entries()) {
       const r = ok(
         await sb
           .from("sensors")
@@ -164,7 +163,7 @@ async function seed() {
               code: se.code,
               name: se.name,
               type: se.type,
-              dev_eui: se.downstreamPoint ? null : `70B3D57ED00${s.code === "CHQ" ? "1" : "2"}${se.code.replace(/[^A-Z0-9]/g, "").slice(-4).padStart(4, "0")}`,
+              dev_eui: se.downstreamPoint ? null : `70B3D57ED00${s.code === "CHQ" ? "1" : "2"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`,
               unit: se.unit,
               decimals: se.decimals,
               lat: se.lat,

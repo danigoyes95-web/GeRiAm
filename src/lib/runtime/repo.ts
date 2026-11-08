@@ -101,7 +101,8 @@ export function simSensorsFor(b: OrgBundle, site: SiteRow): SimSensor[] {
         type: s.type as SensorType,
         intervalS: s.report_interval_s,
         station,
-        lora: !!s.dev_eui && !station,
+        // solo los nodos LoRaWAN pierden paquetes; UPS y Starlink van cableados al gateway
+        lora: !!s.dev_eui && !station && (s.metadata as { enlace?: string } | null)?.enlace === "LoRaWAN",
         baseRssi: Number(s.rssi ?? -100),
         baseSnr: Number(s.snr ?? 3),
       };

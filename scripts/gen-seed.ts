@@ -100,9 +100,9 @@ values (${site(s.slug)}, ${point(d.point)}, ${ORG}, ${d.distancia_km}, ${d.llega
 on conflict (site_id, point_id) do update set distancia_km = excluded.distancia_km, tiempo_llegada_min = excluded.tiempo_llegada_min,
   tiempo_transito_normal_min = excluded.tiempo_transito_normal_min, fuente = excluded.fuente;`);
   }
-  for (const se of s.sensors) {
+  for (const [idx, se] of s.sensors.entries()) {
     const gw = se.downstreamPoint ? "null" : `(select id from geriam.gateways where eui = ${q(s.gateway.eui)})`;
-    const eui = se.downstreamPoint ? "null" : q(`70B3D57ED00${s.code === "CHQ" ? "1" : "2"}${se.code.replace(/[^A-Z0-9]/g, "").slice(-4).padStart(4, "0")}`);
+    const eui = se.downstreamPoint ? "null" : q(`70B3D57ED00${s.code === "CHQ" ? "1" : "2"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`);
     out.push(`insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
 values (${ORG}, ${site(s.slug)}, ${gw}, ${q(se.code)}, ${q(se.name)}, ${q(se.type)}, ${eui}, ${q(se.unit)}, ${se.decimals}, ${se.lat}, ${se.lng}, ${q(se.position)},
