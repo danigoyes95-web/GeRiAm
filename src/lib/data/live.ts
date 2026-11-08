@@ -57,6 +57,24 @@ function upsertById<T extends { id: string }>(list: T[], row: T): T[] {
   return copy;
 }
 
+let drillFetch: Promise<void> | null = null;
+/** Relee el simulacro activo (sin la columna pesada `snapshot`). */
+export function refreshDrill(qc: QueryClient) {
+  if (drillFetch) return drillFetch;
+  drillFetch = (async () => {
+    const { data } = await getBrowserClient()
+      .from("drill_runs")
+      .select("id, organization_id, scenario, site_id, speed, status, sim_minutes, phase, started_by, started_at, last_step_at, ended_at, state")
+      .neq("status", "finalizado")
+      .limit(1);
+    const drill = (data?.[0] as DrillRun | undefined) ?? null;
+    qc.setQueryData<OrgLive>(ORG_LIVE_KEY, (d) => (d ? { ...d, drill, fetchedAt: Date.now() } : d));
+  })().finally(() => {
+    drillFetch = null;
+  });
+  return drillFetch;
+}
+
 // Una sola suscripción Realtime compartida por todos los componentes que usan useOrgLive
 // (Supabase no permite registrar callbacks en un canal ya suscrito).
 const shared: { count: number; channel: ReturnType<ReturnType<typeof getBrowserClient>["channel"]> | null } = { count: 0, channel: null };
@@ -88,8 +106,17 @@ function startRealtime(qc: QueryClient) {
         patch((d) => ({ ...d, drill: null }));
         return;
       }
-      const row = p.new as DrillRun;
-      patch((d) => ({ ...d, drill: row.status === "finalizado" ? null : row }));
+      // Realtime recorta cargas grandes (drill.state): si faltan campos, se pide la fila completa.
+      const row = p.new as Partial<DrillRun>;
+      if (row.status === "finalizado") {
+        patch((d) => ({ ...d, drill: null }));
+        return;
+      }
+      if (row.id && row.scenario && row.status && row.site_id) {
+        patch((d) => ({ ...d, drill: { ...(d.drill?.id === row.id ? d.drill : {}), ...row } as DrillRun }));
+      } else {
+        void refreshDrill(qc);
+      }
     })
     .on("postgres_changes", { event: "UPDATE", schema: "geriam", table: "gateways" }, (p) => {
       const row = p.new as Gateway;

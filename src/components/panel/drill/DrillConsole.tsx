@@ -26,7 +26,7 @@ import { AlertCountdown } from "@/components/alerts/AlertCountdown";
 import { AlertActions } from "@/components/alerts/AlertActions";
 import { NotificationLog } from "@/components/alerts/NotificationLog";
 import { usePanel } from "@/components/panel/PanelContext";
-import { ORG_LIVE_KEY, sortAlerts, useOrgLive, useSiteSummaries } from "@/lib/data/live";
+import { ORG_LIVE_KEY, refreshDrill, sortAlerts, useOrgLive, useSiteSummaries } from "@/lib/data/live";
 import { useDrillSeries } from "@/lib/data/series";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import { SCENARIOS, SCENARIO_LIST, type ScenarioId } from "@/lib/sim/scenarios";
@@ -78,6 +78,10 @@ export function DrillConsole() {
   }, [drill, canRun, qc]);
 
   if (!data) return <div className="p-6 text-sm text-fg-muted">Cargando…</div>;
+  if (drill && !SCENARIOS[drill.scenario as ScenarioId]) {
+    void refreshDrill(qc);
+    return <div className="p-6 text-sm text-fg-muted">Sincronizando simulacro…</div>;
+  }
   return drill ? (
     <Active drill={drill} summaries={summaries} canRun={canRun} />
   ) : (

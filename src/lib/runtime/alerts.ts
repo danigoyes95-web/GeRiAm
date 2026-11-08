@@ -60,7 +60,10 @@ async function createOrUpdate(sb: Admin, b: OrgBundle, site: SiteRow, d: AlertDr
   const realNow = new Date().toISOString();
   const policies = policySteps(b);
   if (d.existing) {
-    const patch: Partial<AlertRow> = { last_triggered_at: opts.drillRunId ? realNow : nowIso, trigger_values: d.triggerValues as never };
+    // conservar el minuto simulado de inicio: la cuenta regresiva parte del primer disparo
+    const keepStart = d.existing.simStartedMin ?? opts.simMinutes;
+    const tvKeep = keepStart !== undefined ? { ...d.triggerValues, sim_started_min: keepStart } : d.triggerValues;
+    const patch: Partial<AlertRow> = { last_triggered_at: opts.drillRunId ? realNow : nowIso, trigger_values: tvKeep as never };
     if (d.notify) {
       patch.level = d.level;
       patch.title = d.title;
@@ -69,8 +72,7 @@ async function createOrUpdate(sb: Admin, b: OrgBundle, site: SiteRow, d: AlertDr
       patch.eta_primary_min = d.etaPrimaryMin;
       patch.escalation_step = 0;
       patch.status = "activa";
-      patch.started_at = realNow;
-      if (opts.simMinutes !== undefined) patch.trigger_values = { ...d.triggerValues, sim_started_min: opts.simMinutes } as never;
+      // al subir de nivel no se reinicia started_at (la llegada se cuenta desde el primer disparo)
     }
     const r = await sb.from("alerts").update(patch).eq("id", d.existing.id).select("*").single();
     if (r.error) throw new Error(`alert update: ${r.error.message}`);

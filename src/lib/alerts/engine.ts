@@ -41,6 +41,8 @@ export interface OpenAlert {
   lastTriggeredAt: number;
   startedAt: number;
   type: AlertType;
+  /** minuto simulado de inicio (simulacro): se conserva en cada reevaluación */
+  simStartedMin?: number;
 }
 
 export interface Route {

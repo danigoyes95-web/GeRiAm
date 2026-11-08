@@ -28,8 +28,15 @@ export function GaugeNivel({ cota, fondo, namo, name, vertedero, cresta, fillPct
   const H = compact ? 150 : 210;
   const top = 18;
   const bottom = H - 16;
-  const range = cresta + 0.6 - fondo;
-  const y = (c: number) => bottom - ((c - fondo) / range) * (bottom - top);
+  // Escala por tramos: el fondo del vaso se comprime (30 % del alto) para dar espacio
+  // a la franja de operación (NAMO − 4 m … cresta + 0,6 m), donde están todas las cotas.
+  const top_c = cresta + 0.6;
+  const split = Math.max(fondo + 1, Math.min(namo - 4, top_c - 2));
+  const ySplit = bottom - 0.3 * (bottom - top);
+  const y = (c: number) =>
+    c <= split
+      ? bottom - ((Math.max(c, fondo) - fondo) / (split - fondo)) * (bottom - ySplit)
+      : ySplit - ((Math.min(c, top_c + 0.5) - split) / (top_c - split)) * (ySplit - top);
   const yw = cota === null ? bottom : clamp(y(cota), top - 4, bottom);
   const water = level === "normal" ? "var(--accent)" : LEVELS[level].cssVar;
   // valle: paredes inclinadas
@@ -44,6 +51,15 @@ export function GaugeNivel({ cota, fondo, namo, name, vertedero, cresta, fillPct
   ];
   if (vertedero !== namo) marks.push({ c: namo, label: "NAMO", color: "var(--fg-muted)", dash: "2 3" });
 
+  // separar etiquetas que caen muy juntas
+  const sorted = marks.slice().sort((a, b) => b.c - a.c);
+  const labelY: Record<string, number> = {};
+  let last = -Infinity;
+  for (const m of sorted) {
+    const yy = Math.max(y(m.c), last + 10);
+    labelY[m.label] = yy;
+    last = yy;
+  }
   return (
     <div className={cn("relative", className)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Nivel ${formatNumber(cota, 2)} m s. n. m.`}>
@@ -82,11 +98,9 @@ export function GaugeNivel({ cota, fondo, namo, name, vertedero, cresta, fillPct
         {marks.map((m) => (
           <g key={m.label}>
             <line x1="14" x2="300" y1={y(m.c)} y2={y(m.c)} stroke={m.color} strokeDasharray={m.dash} strokeWidth="1" opacity=".8" />
-            <text x="304" y={y(m.c) + 3} fontSize="8.5" fill={m.color} className="font-sans" textAnchor="start">
-              {m.c.toFixed(1)}
-            </text>
-            <text x="18" y={y(m.c) - 3} fontSize="8.5" fill={m.color} className="font-sans">
-              {m.label}
+
+            <text x="18" y={labelY[m.label] - 3} fontSize="8.5" fill={m.color} className="font-sans">
+              {m.label} {m.c.toFixed(1).replace(".", ",")}
             </text>
           </g>
         ))}
