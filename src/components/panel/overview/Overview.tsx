@@ -14,6 +14,8 @@ import { AlertsColumn } from "./AlertsColumn";
 import { SiteKpiPanel } from "./SiteKpiPanel";
 import { MapDetail } from "./MapDetail";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorScreen } from "@/components/ErrorScreen";
 
 const LEGEND = ["normal", "amarilla", "naranja", "roja", "sin_datos", "offline"] as const;
 
@@ -55,11 +57,12 @@ export function Overview() {
   }
 
   return (
-    <div className="grid gap-3 p-3 xl:h-[calc(100dvh-3.5rem)] xl:grid-rows-[minmax(0,1fr)_auto]">
+    <div className="grid gap-3 p-3">
       {/* Fila superior: mapa + alertas */}
-      <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <Card className="relative min-h-[420px] overflow-hidden">
+      <div className="grid gap-3 xl:h-[clamp(440px,calc(100dvh-28rem),900px)] xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Card className="relative h-[60vh] min-h-[380px] overflow-hidden xl:h-auto xl:min-h-0">
           {data ? (
+            <ErrorBoundary fallback={(e, reset) => <div className="absolute inset-0"><ErrorScreen compact error={e} reset={reset} /></div>}>
             <BasinMap
               className="absolute inset-0"
               center={panel.mapCenter}
@@ -74,6 +77,7 @@ export function Overview() {
               selected={sel}
               flight={flight}
             />
+            </ErrorBoundary>
           ) : (
             <Skeleton className="absolute inset-0 rounded-none" />
           )}

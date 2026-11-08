@@ -96,6 +96,7 @@ export function BasinMap({
   const markersRef = useRef<Marker[]>([]);
   const userMarkerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
+  const [dataNonce, setDataNonce] = useState(0);
   const [failed, setFailed] = useState<string | null>(TOKEN ? null : "Falta NEXT_PUBLIC_MAPBOX_TOKEN");
   const onSelectRef = useRef(onSelect);
   useEffect(() => {
@@ -129,44 +130,58 @@ export function BasinMap({
         const msg = (e as { error?: { message?: string } }).error?.message ?? "";
         if (/access token|401|403/i.test(msg)) setFailed("Token de Mapbox inválido o restringido");
       });
-      map.on("style.load", () => {
-        map.addSource("mapbox-dem", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
-        map.setTerrain({ source: "mapbox-dem", exaggeration: 1.45 });
-        map.setFog({
-          range: [0.8, 9],
-          color: "rgba(186, 210, 235, 0.55)",
-          "high-color": "#24324a",
-          "horizon-blend": 0.12,
-          "space-color": "#070d18",
-          "star-intensity": 0.15,
-        });
-        map.addSource("cauce", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        map.addLayer({ id: "cauce-glow", type: "line", source: "cauce", paint: { "line-color": "#22d3ee", "line-width": 9, "line-opacity": 0.22, "line-blur": 6 } });
-        map.addLayer({ id: "cauce-line", type: "line", source: "cauce", paint: { "line-color": "#67e8f9", "line-width": 2.4, "line-dasharray": [2, 1.5] } });
-        map.addSource("coverage", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        map.addLayer({ id: "coverage-fill", type: "fill", source: "coverage", paint: { "fill-color": "#a78bfa", "fill-opacity": 0.07 } });
-        map.addLayer({ id: "coverage-line", type: "line", source: "coverage", paint: { "line-color": "#a78bfa", "line-width": 1.2, "line-opacity": 0.6, "line-dasharray": [3, 2] } });
-        map.addSource("sensors", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        map.addLayer({
-          id: "sensors-dot",
-          type: "circle",
-          source: "sensors",
-          paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2.5, 15, 6],
-            "circle-color": ["get", "color"],
-            "circle-stroke-color": "#04121a",
-            "circle-stroke-width": 1.2,
-          },
-        });
-        map.on("click", "sensors-dot", (e) => {
-          const f = e.features?.[0] as { properties?: Record<string, unknown> | null } | undefined;
-          const id = f?.properties?.id as string | undefined;
-          if (id) onSelectRef.current?.({ kind: "sensor", id });
-        });
-        map.on("mouseenter", "sensors-dot", () => (map.getCanvas().style.cursor = "pointer"));
-        map.on("mouseleave", "sensors-dot", () => (map.getCanvas().style.cursor = ""));
-        setReady(true);
+      // "style.load" puede dispararse más de una vez (p. ej. al localizar el estilo):
+      // todo lo que se agrega aquí debe ser idempotente.
+      const setupStyle = () => {
+        try {
+          if (!map.getSource("mapbox-dem")) {
+            map.addSource("mapbox-dem", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
+          }
+          map.setTerrain({ source: "mapbox-dem", exaggeration: 1.45 });
+          map.setFog({
+            range: [0.8, 9],
+            color: "rgba(186, 210, 235, 0.55)",
+            "high-color": "#24324a",
+            "horizon-blend": 0.12,
+            "space-color": "#070d18",
+            "star-intensity": 0.15,
+          });
+          const empty = { type: "FeatureCollection" as const, features: [] };
+          if (!map.getSource("cauce")) map.addSource("cauce", { type: "geojson", data: empty });
+          if (!map.getLayer("cauce-glow")) map.addLayer({ id: "cauce-glow", type: "line", source: "cauce", paint: { "line-color": "#22d3ee", "line-width": 9, "line-opacity": 0.22, "line-blur": 6 } });
+          if (!map.getLayer("cauce-line")) map.addLayer({ id: "cauce-line", type: "line", source: "cauce", paint: { "line-color": "#67e8f9", "line-width": 2.4, "line-dasharray": [2, 1.5] } });
+          if (!map.getSource("coverage")) map.addSource("coverage", { type: "geojson", data: empty });
+          if (!map.getLayer("coverage-fill")) map.addLayer({ id: "coverage-fill", type: "fill", source: "coverage", paint: { "fill-color": "#a78bfa", "fill-opacity": 0.07 } });
+          if (!map.getLayer("coverage-line")) map.addLayer({ id: "coverage-line", type: "line", source: "coverage", paint: { "line-color": "#a78bfa", "line-width": 1.2, "line-opacity": 0.6, "line-dasharray": [3, 2] } });
+          if (!map.getSource("sensors")) map.addSource("sensors", { type: "geojson", data: empty });
+          if (!map.getLayer("sensors-dot")) {
+            map.addLayer({
+              id: "sensors-dot",
+              type: "circle",
+              source: "sensors",
+              paint: {
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2.5, 15, 6],
+                "circle-color": ["get", "color"],
+                "circle-stroke-color": "#04121a",
+                "circle-stroke-width": 1.2,
+              },
+            });
+          }
+          setReady(true);
+          setDataNonce((n) => n + 1);
+        } catch (e) {
+          console.error("[mapa]", e);
+          setFailed("No se pudo preparar el relieve 3D");
+        }
+      };
+      map.on("style.load", setupStyle);
+      map.on("click", "sensors-dot", (e) => {
+        const f = e.features?.[0] as { properties?: Record<string, unknown> | null } | undefined;
+        const id = f?.properties?.id as string | undefined;
+        if (id) onSelectRef.current?.({ kind: "sensor", id });
       });
+      map.on("mouseenter", "sensors-dot", () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", "sensors-dot", () => (map.getCanvas().style.cursor = ""));
       if (orbit) {
         const rotate = () => {
           if (!mapRef.current) return;
@@ -191,7 +206,7 @@ export function BasinMap({
   // Datos: cauce, cobertura, sensores
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready) return;
+    if (!map || !ready || !map.isStyleLoaded()) return;
     const cauce = map.getSource("cauce") as GeoJSONSource | undefined;
     cauce?.setData({
       type: "FeatureCollection",
@@ -217,7 +232,7 @@ export function BasinMap({
           })
         : [],
     });
-  }, [ready, sites, gateways, sensors, showCoverage, showSensors]);
+  }, [ready, dataNonce, sites, gateways, sensors, showCoverage, showSensors]);
 
   // Marcadores HTML (embalses, cámaras, gateways, puntos de control)
   useEffect(() => {
