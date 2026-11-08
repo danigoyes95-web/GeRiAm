@@ -44,6 +44,7 @@
   "exclude": [
     "node_modules",
     "supabase/functions",
-    "e2e"
+    "e2e",
+    "src/sw"
   ]
 }

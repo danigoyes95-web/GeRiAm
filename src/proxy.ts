@@ -28,8 +28,8 @@ export async function proxy(request: NextRequest) {
   const isProtected = path.startsWith("/panel") || path.startsWith("/app");
 
   if (isProtected) {
-    // /app/offline funciona sin sesión (shell offline de la PWA)
-    if (path === "/app/offline") return response;
+    // /offline funciona sin sesión (shell offline de la PWA)
+    if (path === "/offline") return response;
     if (!userId) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
