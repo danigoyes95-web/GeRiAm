@@ -12,8 +12,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test --trace off",
     "format": "prettier --write .",
-    "build:edge": "node scripts/build-edge.mjs",
-    "db:backfill": "tsx scripts/generate-backfill.ts"
+    "setup:demo": "tsx --env-file-if-exists=.env.local scripts/setup-demo.ts",
+    "db:seed-sql": "tsx scripts/gen-seed.ts",
+    "db:types": "tsx scripts/gen-types.ts"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",

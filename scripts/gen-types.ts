@@ -84,6 +84,9 @@ lines.push(`    Functions: {
       };
       rain_totals: { Args: { p_site: string; p_at?: string }; Returns: { h1: number; h24: number; h72: number }[] };
       public_status: { Args: { p_slug: string }; Returns: Json };
+      restore_last_values: { Args: { p_site: string }; Returns: undefined };
+      purge_drill: { Args: { p_drill: string }; Returns: undefined };
+      retention: { Args: { p_keep?: string }; Returns: number };
     };`);
 lines.push("    Enums: { [_ in never]: never };");
 lines.push("    CompositeTypes: { [_ in never]: never };");

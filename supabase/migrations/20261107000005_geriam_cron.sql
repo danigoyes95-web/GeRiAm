@@ -1,9 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- GeRiAm · 0005 · Jobs pg_cron (prefijo geriam_) y despacho de notificaciones
+-- GeRiAm · 0005 · Jobs pg_cron (prefijo geriam_)
 --
--- Requiere dos secretos en Vault (se crean aparte, NO en la migración):
---   geriam_functions_url  → https://<ref>.supabase.co/functions/v1
---   geriam_cron_secret    → igual al secreto GERIAM_CRON_SECRET de las Edge Functions
+-- Configuración en geriam.app_secrets (solo service_role; la crea scripts/setup-demo.ts):
+--   functions_url → https://<ref>.supabase.co/functions/v1
+--   cron_secret   → secreto compartido con las Edge Functions geriam-*
+--   app_url       → URL pública de la app (p. ej. https://geriam.vercel.app)
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- Invoca una Edge Function geriam-* de forma asíncrona (pg_net).
@@ -17,10 +18,10 @@ begin
   if p_name !~ '^geriam-[a-z0-9-]+$' then
     raise exception 'función no permitida: %', p_name;
   end if;
-  select decrypted_secret into v_url from vault.decrypted_secrets where name = 'geriam_functions_url';
-  select decrypted_secret into v_secret from vault.decrypted_secrets where name = 'geriam_cron_secret';
+  select value into v_url from geriam.app_secrets where name = 'functions_url';
+  select value into v_secret from geriam.app_secrets where name = 'cron_secret';
   if v_url is null or v_secret is null then
-    raise notice 'GeRiAm: faltan secretos en Vault (geriam_functions_url / geriam_cron_secret)';
+    raise notice 'GeRiAm: faltan functions_url / cron_secret en geriam.app_secrets';
     return null;
   end if;
   return net.http_post(
@@ -32,24 +33,7 @@ begin
 end $$;
 revoke all on function geriam.invoke_function(text, jsonb) from public, anon, authenticated;
 
--- Al insertar notificaciones pendientes → despachar (push / SMS / WhatsApp / demo)
-create or replace function geriam.tg_dispatch_notifications()
-returns trigger language plpgsql security definer set search_path = ''
-as $$
-begin
-  if exists (select 1 from new_rows where status = 'pendiente') then
-    perform geriam.invoke_function('geriam-dispatch', '{}'::jsonb);
-  end if;
-  return null;
-end $$;
-revoke all on function geriam.tg_dispatch_notifications() from public, anon, authenticated;
-
-drop trigger if exists notifications_dispatch on geriam.notifications;
-create trigger notifications_dispatch after insert on geriam.notifications
-  referencing new table as new_rows
-  for each statement execute function geriam.tg_dispatch_notifications();
-
--- Jobs (idempotente: se reprograman con el mismo nombre)
+-- Jobs (idempotente: cron.schedule reprograma por nombre)
 select cron.schedule('geriam_simulator_tick', '* * * * *', $$select geriam.invoke_function('geriam-simulator-tick', '{"mode":"tick"}'::jsonb)$$);
-select cron.schedule('geriam_dispatch_retry', '*/5 * * * *', $$select geriam.invoke_function('geriam-dispatch', '{"retry":true}'::jsonb)$$);
+select cron.schedule('geriam_dispatch_retry', '*/2 * * * *', $$select geriam.invoke_function('geriam-dispatch', '{"retry":true}'::jsonb)$$);
 select cron.schedule('geriam_retention', '17 * * * *', $$select geriam.retention()$$);
