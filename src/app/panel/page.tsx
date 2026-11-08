@@ -1,3 +1,8 @@
+import type { Metadata } from "next";
+import { Overview } from "@/components/panel/overview/Overview";
+
+export const metadata: Metadata = { title: "Vista general" };
+
 export default function PanelHome() {
-  return <div className="p-6 text-sm text-fg-muted">Vista general — en construcción.</div>;
+  return <Overview />;
 }

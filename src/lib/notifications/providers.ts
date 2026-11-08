@@ -2,7 +2,7 @@
  * Proveedores de notificación detrás de una interfaz común (NotificationProvider),
  * para poder cambiar Twilio por otro proveedor sin tocar el motor de alertas.
  */
-import webpush from "web-push";
+import * as webpush from "web-push";
 import type { Admin } from "../runtime/repo";
 import type { Tables } from "../supabase/config";
 
