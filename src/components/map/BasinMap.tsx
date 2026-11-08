@@ -206,7 +206,8 @@ export function BasinMap({
   // Datos: cauce, cobertura, sensores
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !map.isStyleLoaded()) return;
+    // las fuentes existen desde setupStyle (ready); isStyleLoaded() es false mientras cargan teselas
+    if (!map || !ready || !map.getSource("cauce")) return;
     const cauce = map.getSource("cauce") as GeoJSONSource | undefined;
     cauce?.setData({
       type: "FeatureCollection",
@@ -341,7 +342,8 @@ export function BasinMap({
 
   return (
     <div className={cn("relative overflow-hidden bg-[#0b1626]", className)}>
-      <div ref={containerRef} className="absolute inset-0" />
+      {/* estilo en línea: mapbox-gl.css aplica position:relative a .mapboxgl-map y anularía la clase */}
+      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
       {!ready && !failed && (
         <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(ellipse_at_center,#13233a,#070d18)]">
           <div className="flex flex-col items-center gap-2 text-xs text-fg-faint">
