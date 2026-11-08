@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import { channelName } from "@/lib/supabase/config";
 import { LEVEL_RANK, type StatusLevel } from "@/lib/domain/types";
@@ -57,48 +57,62 @@ function upsertById<T extends { id: string }>(list: T[], row: T): T[] {
   return copy;
 }
 
+// Una sola suscripción Realtime compartida por todos los componentes que usan useOrgLive
+// (Supabase no permite registrar callbacks en un canal ya suscrito).
+const shared: { count: number; channel: ReturnType<ReturnType<typeof getBrowserClient>["channel"]> | null } = { count: 0, channel: null };
+
+function startRealtime(qc: QueryClient) {
+  const sb = getBrowserClient();
+  const patch = (fn: (d: OrgLive) => OrgLive) =>
+    qc.setQueryData<OrgLive>(ORG_LIVE_KEY, (d) => (d ? { ...fn(d), fetchedAt: Date.now() } : d));
+  return sb
+    .channel(channelName("org-live"))
+    .on("postgres_changes", { event: "UPDATE", schema: "geriam", table: "sensors" }, (p) => {
+      const row = p.new as Sensor;
+      patch((d) => ({ ...d, sensors: d.sensors.map((s) => (s.id === row.id ? row : s)) }));
+    })
+    .on("postgres_changes", { event: "*", schema: "geriam", table: "alerts" }, (p) => {
+      if (p.eventType === "DELETE") {
+        const old = p.old as Partial<Alert>;
+        patch((d) => ({ ...d, alerts: d.alerts.filter((a) => a.id !== old.id) }));
+        return;
+      }
+      const row = p.new as Alert;
+      patch((d) => ({
+        ...d,
+        alerts: row.status === "resuelta" ? d.alerts.filter((a) => a.id !== row.id) : upsertById(d.alerts, row),
+      }));
+    })
+    .on("postgres_changes", { event: "*", schema: "geriam", table: "drill_runs" }, (p) => {
+      if (p.eventType === "DELETE") {
+        patch((d) => ({ ...d, drill: null }));
+        return;
+      }
+      const row = p.new as DrillRun;
+      patch((d) => ({ ...d, drill: row.status === "finalizado" ? null : row }));
+    })
+    .on("postgres_changes", { event: "UPDATE", schema: "geriam", table: "gateways" }, (p) => {
+      const row = p.new as Gateway;
+      patch((d) => ({ ...d, gateways: d.gateways.map((g) => (g.id === row.id ? row : g)) }));
+    })
+    .subscribe();
+}
+
 /** Estado vivo de la organización: carga inicial + Realtime (sensores, alertas, simulacro, gateways). */
 export function useOrgLive() {
   const qc = useQueryClient();
   const query = useQuery({ queryKey: ORG_LIVE_KEY, queryFn: fetchOrgLive, refetchInterval: 60_000 });
 
   useEffect(() => {
-    const sb = getBrowserClient();
-    const patch = (fn: (d: OrgLive) => OrgLive) =>
-      qc.setQueryData<OrgLive>(ORG_LIVE_KEY, (d) => (d ? { ...fn(d), fetchedAt: Date.now() } : d));
-    const ch = sb
-      .channel(channelName("org-live"))
-      .on("postgres_changes", { event: "UPDATE", schema: "geriam", table: "sensors" }, (p) => {
-        const row = p.new as Sensor;
-        patch((d) => ({ ...d, sensors: d.sensors.map((s) => (s.id === row.id ? row : s)) }));
-      })
-      .on("postgres_changes", { event: "*", schema: "geriam", table: "alerts" }, (p) => {
-        if (p.eventType === "DELETE") {
-          const old = p.old as Partial<Alert>;
-          patch((d) => ({ ...d, alerts: d.alerts.filter((a) => a.id !== old.id) }));
-          return;
-        }
-        const row = p.new as Alert;
-        patch((d) => ({
-          ...d,
-          alerts: row.status === "resuelta" ? d.alerts.filter((a) => a.id !== row.id) : upsertById(d.alerts, row),
-        }));
-      })
-      .on("postgres_changes", { event: "*", schema: "geriam", table: "drill_runs" }, (p) => {
-        if (p.eventType === "DELETE") {
-          patch((d) => ({ ...d, drill: null }));
-          return;
-        }
-        const row = p.new as DrillRun;
-        patch((d) => ({ ...d, drill: row.status === "finalizado" ? null : row }));
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "geriam", table: "gateways" }, (p) => {
-        const row = p.new as Gateway;
-        patch((d) => ({ ...d, gateways: d.gateways.map((g) => (g.id === row.id ? row : g)) }));
-      })
-      .subscribe();
+    shared.count += 1;
+    if (!shared.channel) shared.channel = startRealtime(qc);
     return () => {
-      void sb.removeChannel(ch);
+      shared.count -= 1;
+      if (shared.count === 0 && shared.channel) {
+        const ch = shared.channel;
+        shared.channel = null;
+        void getBrowserClient().removeChannel(ch);
+      }
     };
   }, [qc]);
 
