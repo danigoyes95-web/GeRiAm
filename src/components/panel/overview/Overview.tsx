@@ -90,7 +90,7 @@ export function Overview() {
               <Navigation /> Seguir cauce a Ambato
             </Button>
           </div>
-          <div className="absolute bottom-3 left-3 flex flex-col gap-2">
+          <div className="absolute bottom-9 left-3 flex flex-col gap-2">
             {sel && data && (
               <MapDetail sel={sel} data={data} summaries={summaries} entity={panel.branding.entity ?? panel.orgName} onClose={() => setSel(null)} />
             )}
