@@ -167,6 +167,13 @@ export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Om
     }
   }
 
+  // Red de seguridad: alertas que quedaron abiertas de simulacros ya finalizados
+  const orphan = await sb.from("drill_runs").select("id").eq("organization_id", b.org.id).eq("status", "finalizado").gte("ended_at", new Date(now - 6 * 3600_000).toISOString());
+  const orphanIds = (orphan.data ?? []).map((d) => d.id);
+  if (orphanIds.length) {
+    await sb.from("alerts").update({ status: "resuelta", resolved_at: new Date(now).toISOString() }).in("drill_run_id", orphanIds).neq("status", "resuelta");
+  }
+
   // Alertas
   let evaluated = 0;
   for (const site of b.sites.filter((s) => s.id !== drillSite)) evaluated += await evaluateSite(sb, b, site, now, overrides);

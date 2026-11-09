@@ -195,6 +195,9 @@ async function advance(sb: Admin, b: OrgBundle, drill: NonNullable<OrgBundle["dr
     d.dedupeKey = prefix + d.dedupeKey;
     if (d.existing) d.existing = openRows.map((a) => toOpenAlert(a)).find((a) => a.id === d.existing?.id) ?? d.existing;
   }
+  // Si el simulacro se finalizó mientras se calculaba este paso, no se tocan alertas ni estado.
+  const still = await sb.from("drill_runs").select("status").eq("id", drill.id).single();
+  if (still.data?.status === "finalizado") return { ...drill, status: "finalizado" };
   await applyEvaluation(sb, b, site, result, { now: simNow, drillRunId: drill.id, simMinutes: Math.round(simMin) });
   await runEscalations(sb, b, openRows, { now: simNow, drillRunId: drill.id, simStartMs: st.startT });
 
@@ -204,8 +207,10 @@ async function advance(sb: Admin, b: OrgBundle, drill: NonNullable<OrgBundle["dr
     .from("drill_runs")
     .update({ sim_minutes: simMin, phase: phaseLabel, last_step_at: new Date().toISOString(), state: st as never, ...(done ? { status: "pausado" } : {}) })
     .eq("id", drill.id)
+    .neq("status", "finalizado")
     .select("*")
-    .single();
+    .maybeSingle();
+  if (!up.data && !up.error) return { ...drill, status: "finalizado" };
   if (up.error) throw new Error(up.error.message);
   return up.data;
 }
@@ -262,8 +267,9 @@ async function finishDrill(sb: Admin, drillId: string, snap: { sim_state?: SiteS
       .update({ state: snap.sim_state as never, sim_time: new Date(snap.sim_state.t).toISOString(), updated_at: new Date().toISOString() })
       .eq("site_id", drill.site_id);
   }
-  await sb.from("alerts").update({ status: "resuelta", resolved_at: new Date().toISOString() }).eq("drill_run_id", drillId).neq("status", "resuelta");
+  // Primero se marca finalizado (los pasos en curso lo verifican antes de escribir) y luego se cierran sus alertas.
   await sb.from("drill_runs").update({ status: "finalizado", ended_at: new Date().toISOString() }).eq("id", drillId);
+  await sb.from("alerts").update({ status: "resuelta", resolved_at: new Date().toISOString() }).eq("drill_run_id", drillId).neq("status", "resuelta");
   if (purge) await sb.rpc("purge_drill", { p_drill: drillId });
   await sb.rpc("restore_last_values", { p_site: drill.site_id });
   await audit(sb, drill.organization_id, purge ? "simulacro.reiniciado" : "simulacro.finalizado", "drill_run", drillId, { sim_minutes: Math.round(drill.sim_minutes) }, actor, drillId);
