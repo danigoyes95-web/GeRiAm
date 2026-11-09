@@ -43,6 +43,8 @@ export interface BasinMapProps {
   flight?: { target: "cuenca" | "ambato" | "site"; siteId?: string; nonce: number } | null;
   /** Mostrar solo nivel de detalle compacto (app móvil) */
   compact?: boolean;
+  /** Sin mensajes de carga/error (fondo decorativo del portal) */
+  quiet?: boolean;
 }
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -90,6 +92,7 @@ export function BasinMap({
   className,
   flight,
   compact,
+  quiet,
 }: BasinMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
@@ -344,7 +347,7 @@ export function BasinMap({
     <div className={cn("relative overflow-hidden bg-[#0b1626]", className)}>
       {/* estilo en línea: mapbox-gl.css aplica position:relative a .mapboxgl-map y anularía la clase */}
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
-      {!ready && !failed && (
+      {!ready && !failed && !quiet && (
         <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(ellipse_at_center,#13233a,#070d18)]">
           <div className="flex flex-col items-center gap-2 text-xs text-fg-faint">
             <span className="size-6 animate-spin rounded-full border-2 border-accent/30 border-t-accent" aria-hidden />
@@ -352,7 +355,7 @@ export function BasinMap({
           </div>
         </div>
       )}
-      {failed && (
+      {failed && !quiet && (
         <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(ellipse_at_center,#13233a,#070d18)] p-6 text-center">
           <div className="flex max-w-xs flex-col items-center gap-2">
             <MapPinOff className="size-6 text-fg-faint" aria-hidden />

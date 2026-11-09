@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Isotipo } from "@/design";
 import { DrillBanner } from "@/components/DrillBanner";
 import { OnlineIndicator } from "./OnlineIndicator";
+import { useOrgLive } from "@/lib/data/live";
 
 const TABS = [
   { href: "/app", label: "Inicio", icon: Home },
@@ -15,8 +16,10 @@ const TABS = [
   { href: "/app/camaras", label: "Cámaras", icon: Camera },
 ];
 
-export function AppShell({ userName, roleLabel, alertCount, children }: { userName: string; roleLabel: string; alertCount?: number; children: React.ReactNode }) {
+export function AppShell({ userName, roleLabel, children }: { userName: string; roleLabel: string; children: React.ReactNode }) {
   const pathname = usePathname();
+  const { data } = useOrgLive();
+  const alertCount = data?.alerts.length ?? 0;
   const active = (href: string) => (href === "/app" ? pathname === "/app" : pathname.startsWith(href));
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col bg-bg">
