@@ -24,7 +24,36 @@ export interface SiteParams {
   curve: AreaVolumePoint[];
   /** capacidad máxima de la descarga de fondo (m³/s) */
   valveMax: number;
+  /** climatología de lluvia (calibrada con la estación HGPT del embalse) */
+  climate: RainClimate;
 }
+
+/** Parámetros del generador estocástico de lluvia (de registros reales). */
+export interface RainClimate {
+  meanMmDay: number;
+  monthlyFactor: number[]; // 12 valores, media ≈ 1
+  diurnal: number[]; // 24 fracciones (suman ≈ 1)
+  eventsPerYear: number; // eventos ≥ 2 mm
+  durMedianH: number;
+  durP90H: number;
+  peakMedianMmH: number;
+  peakP90MmH: number;
+  /** máximo horario observado (mm/h): techo físico del generador */
+  maxHourMmH: number;
+}
+
+/** Climatología por defecto (≈ HGPT-MT-01 Chiquiurco, 2013–2025) para sitios sin estación. */
+export const DEFAULT_CLIMATE: RainClimate = {
+  meanMmDay: 2.78,
+  monthlyFactor: [0.966, 0.838, 1.008, 1.046, 1.266, 1.577, 1.54, 0.84, 0.681, 0.682, 0.814, 0.743],
+  diurnal: [0.048, 0.047, 0.053, 0.051, 0.048, 0.046, 0.044, 0.043, 0.037, 0.032, 0.033, 0.029, 0.034, 0.044, 0.05, 0.051, 0.047, 0.041, 0.031, 0.033, 0.033, 0.039, 0.041, 0.043],
+  eventsPerYear: 122.6,
+  durMedianH: 6,
+  durP90H: 13,
+  peakMedianMmH: 1.8,
+  peakP90MmH: 4.4,
+  maxHourMmH: 36.2,
+};
 
 export interface Storm {
   remainingMin: number;
@@ -73,7 +102,10 @@ export interface Forcing {
   valveOpen?: number; // fuerza caudal de la descarga de fondo (m³/s)
 }
 
-export const MEAN_RAIN_MM_DAY = 4.5;
+const Z90 = 1.2816;
+const DRIZZLE_SHARE = 0.22; // fracción de la lluvia anual que cae como garúa (≈ 21 % de horas con lluvia)
+const DRIZZLE_MMH = 0.25;
+const DRIZZLE_MEAN_MIN = 90;
 const K_FAST_S = 3.5 * 3600;
 const K_SLOW_S = 60 * 3600;
 const HIST_STEP_S = 300;
@@ -84,7 +116,7 @@ export function localHour(tMs: number): number {
 }
 
 function runoffCoef(p: SiteParams): number {
-  const meanRate = ((MEAN_RAIN_MM_DAY / 1000) * p.areaCuencaKm2 * 1e6) / 86400; // m³/s de lluvia media
+  const meanRate = ((p.climate.meanMmDay / 1000) * p.areaCuencaKm2 * 1e6) / 86400; // m³/s de lluvia media
   return (0.7 * p.qinBase) / meanRate;
 }
 
@@ -101,7 +133,7 @@ export function riverStageBelowDam(q: number) {
 /** Estado inicial en equilibrio a una cota dada. */
 export function initialState(p: SiteParams, cota: number, tMs: number, seed: number): SiteState {
   const coef = runoffCoef(p);
-  const meanRate = ((MEAN_RAIN_MM_DAY / 1000) * p.areaCuencaKm2 * 1e6) / 86400;
+  const meanRate = ((p.climate.meanMmDay / 1000) * p.areaCuencaKm2 * 1e6) / 86400;
   const sFast = 0.4 * coef * meanRate * K_FAST_S;
   const sSlow = 0.6 * coef * meanRate * K_SLOW_S;
   const qout = p.qoutNominal;
@@ -135,27 +167,51 @@ export function initialState(p: SiteParams, cota: number, tMs: number, seed: num
 }
 
 function valveTarget(p: SiteParams, s: SiteState): number {
-  // Operación: caudal nominal (abastecimiento/regulación). Si el nivel supera
-  // NAMO − 0,45 m, la operación abre progresivamente la descarga de fondo.
+  // Regla de operación: caudal nominal (abastecimiento/regulación). Si el nivel supera
+  // NAMO − 0,45 m, se abre progresivamente la descarga de fondo. Si el embalse baja de
+  // NAMO − 2 m, se reduce la entrega hasta un 40 % (caudal mínimo garantizado) en NAMO − 6 m.
   const trigger = p.namo - 0.45;
+  if (s.cota < p.namo - 2) {
+    const f = Math.max(0.4, 1 - (0.6 * (p.namo - 2 - s.cota)) / 4);
+    return p.qoutNominal * f;
+  }
   if (s.cota <= trigger) return p.qoutNominal;
   const extra = (s.cota - trigger) * 1.6 * Math.max(1, s.qin / Math.max(0.05, p.qinBase));
   return Math.min(p.valveMax, Math.max(p.qoutNominal, p.qoutNominal + extra));
 }
 
-function stepRain(s: SiteState, rng: Rng, dtS: number, forcing?: Forcing) {
+/** Escala de intensidad para que la lluvia media generada coincida con la climatología. */
+function stormScale(c: RainClimate): number {
+  const sp = Math.log(c.peakP90MmH / c.peakMedianMmH) / Z90;
+  const sd = Math.log(c.durP90H / c.durMedianH) / Z90;
+  const ePeak = c.peakMedianMmH * Math.exp((sp * sp) / 2);
+  const eDur = c.durMedianH * Math.exp((sd * sd) / 2);
+  const expected = c.eventsPerYear * 0.5 * ePeak * eDur; // mm/año (hidrograma triangular)
+  // 1,12: corrección empírica (truncamientos del generador), verificada en tests/climate.test.ts
+  return (1.12 * (1 - DRIZZLE_SHARE) * c.meanMmDay * 365) / Math.max(1, expected);
+}
+
+function stepRain(p: SiteParams, s: SiteState, rng: Rng, dtS: number, forcing?: Forcing) {
   if (forcing?.rainMmH !== undefined) {
     s.intensity = Math.max(0, forcing.rainMmH * (1 + rng.gauss(0, 0.08)));
     s.storm = null;
     return;
   }
+  const c = p.climate;
   const dtMin = dtS / 60;
-  const h = localHour(s.t);
-  const diurnal = h >= 12 && h < 19 ? 1.8 : h >= 6 && h < 12 ? 0.8 : 0.6;
+  const h = Math.floor(localHour(s.t)) % 24;
+  const month = new Date(s.t - 5 * 3600_000).getUTCMonth();
+  const seasonal = c.monthlyFactor[month] ?? 1;
+  const diurnal = (c.diurnal[h] ?? 1 / 24) * 24;
   if (!s.storm) {
-    if (rng.chance((0.042 / 60) * dtMin * diurnal)) {
-      const peak = Math.min(38, Math.exp(rng.gauss(Math.log(3.2), 0.7)));
-      const dur = rng.range(40, 260);
+    const perMin = (c.eventsPerYear / 365 / 1440) * seasonal * diurnal;
+    if (rng.chance(perMin * dtMin)) {
+      const sp = Math.log(c.peakP90MmH / c.peakMedianMmH) / Z90;
+      const sd = Math.log(c.durP90H / c.durMedianH) / Z90;
+      const peak = Math.min(c.maxHourMmH * 1.1, Math.exp(rng.gauss(Math.log(c.peakMedianMmH), sp)) * stormScale(c) * Math.sqrt(seasonal));
+      // eventos intensos son cortos (convectivos); los largos son de baja intensidad
+      const durCap = peak > c.peakP90MmH * 1.5 ? 6 * 60 : 60 * 60;
+      const dur = Math.min(durCap, Math.max(30, Math.exp(rng.gauss(Math.log(c.durMedianH), sd)) * 60));
       s.storm = { remainingMin: dur, durationMin: dur, peak };
     }
   }
@@ -163,15 +219,16 @@ function stepRain(s: SiteState, rng: Rng, dtS: number, forcing?: Forcing) {
   if (s.storm) {
     const prog = 1 - s.storm.remainingMin / s.storm.durationMin;
     const shape = prog < 0.35 ? prog / 0.35 : (1 - prog) / 0.65;
-    storm = s.storm.peak * Math.max(0, shape) * (1 + rng.gauss(0, 0.18));
+    storm = s.storm.peak * Math.max(0, shape) * Math.max(0, 1 + rng.gauss(0, 0.2));
     s.storm.remainingMin -= dtMin;
     if (s.storm.remainingMin <= 0) s.storm = null;
   }
   // garúa de páramo
-  if (s.drizzleMin <= 0 && rng.chance((0.05 / 60) * dtMin)) s.drizzleMin = rng.range(20, 120);
+  const drizzlePerMin = (DRIZZLE_SHARE * c.meanMmDay * seasonal) / (DRIZZLE_MMH * (DRIZZLE_MEAN_MIN / 60)) / 1440;
+  if (s.drizzleMin <= 0 && rng.chance(drizzlePerMin * dtMin)) s.drizzleMin = rng.range(30, 150);
   let drizzle = 0;
   if (s.drizzleMin > 0) {
-    drizzle = Math.max(0, rng.gauss(0.35, 0.15));
+    drizzle = Math.max(0, rng.gauss(DRIZZLE_MMH, 0.1));
     s.drizzleMin -= dtMin;
   }
   s.intensity = Math.max(0, storm + drizzle);
@@ -188,7 +245,7 @@ export function stepSite(p: SiteParams, prev: SiteState, dtS: number, forcing?: 
     remaining -= dt;
     s.t += dt * 1000;
 
-    stepRain(s, rng, dt, forcing);
+    stepRain(p, s, rng, dt, forcing);
     s.rainAcc += (s.intensity * dt) / 3600;
 
     // escorrentía: dos depósitos lineales

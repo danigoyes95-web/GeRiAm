@@ -405,3 +405,24 @@
   border: 3px solid #fff;
   box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.25);
 }
+.geriam-station {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+.geriam-station .gs-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: #818cf8;
+  border: 2px solid #070d18;
+  box-shadow: 0 0 0 1px #818cf8;
+}
+.geriam-station .gs-label {
+  font: 600 9.5px/1 var(--font-mono);
+  color: #e0e7ff;
+  background: rgba(7, 13, 24, 0.75);
+  padding: 2px 4px;
+  border-radius: 3px;
+}

@@ -1,5 +1,5 @@
 import type { AreaVolumePoint } from "../domain/types";
-import type { SiteParams } from "./physics";
+import { DEFAULT_CLIMATE, type RainClimate, type SiteParams } from "./physics";
 
 /** Construye parámetros físicos desde una fila de geriam.sites (o equivalente). */
 export function siteParamsFromRow(row: {
@@ -16,6 +16,7 @@ export function siteParamsFromRow(row: {
   area_cuenca_km2: number | string;
   capacity_m3: number | string;
   curva_area_volumen: unknown;
+  metadata?: unknown;
 }): SiteParams {
   const n = (v: number | string) => Number(v);
   return {
@@ -33,5 +34,35 @@ export function siteParamsFromRow(row: {
     capacity: n(row.capacity_m3),
     curve: (row.curva_area_volumen as AreaVolumePoint[]) ?? [],
     valveMax: Math.max(1.5, 6 * n(row.caudal_salida_nominal)),
+    climate: climateFromMetadata(row.metadata),
+  };
+}
+
+interface ClimaMeta {
+  lluvia_media_mm_dia?: number;
+  factor_mensual?: number[];
+  diurno?: number[];
+  eventos_anio?: number;
+  evento_duracion_mediana_h?: number;
+  evento_duracion_p90_h?: number;
+  evento_pico_mediana_mmh?: number;
+  evento_pico_p90_mmh?: number;
+  max_horario?: { mm: number };
+}
+
+/** Lee la climatología (sites.metadata.clima) cargada desde config/climatologia.*.ts */
+export function climateFromMetadata(meta: unknown): RainClimate {
+  const c = (meta as { clima?: ClimaMeta } | null | undefined)?.clima;
+  if (!c?.lluvia_media_mm_dia) return DEFAULT_CLIMATE;
+  return {
+    meanMmDay: c.lluvia_media_mm_dia,
+    monthlyFactor: c.factor_mensual?.length === 12 ? c.factor_mensual : DEFAULT_CLIMATE.monthlyFactor,
+    diurnal: c.diurno?.length === 24 ? c.diurno : DEFAULT_CLIMATE.diurnal,
+    eventsPerYear: c.eventos_anio ?? DEFAULT_CLIMATE.eventsPerYear,
+    durMedianH: c.evento_duracion_mediana_h ?? DEFAULT_CLIMATE.durMedianH,
+    durP90H: c.evento_duracion_p90_h ?? DEFAULT_CLIMATE.durP90H,
+    peakMedianMmH: c.evento_pico_mediana_mmh ?? DEFAULT_CLIMATE.peakMedianMmH,
+    peakP90MmH: c.evento_pico_p90_mmh ?? DEFAULT_CLIMATE.peakP90MmH,
+    maxHourMmH: c.max_horario?.mm ?? DEFAULT_CLIMATE.maxHourMmH,
   };
 }
