@@ -33,12 +33,12 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     id: "tormenta",
     title: "Tormenta extrema en páramo",
     summary:
-      "Lluvia convectiva intensa sobre la cuenca alta. La entrada crece, el embalse sube, se activa el vertedero y el nivel se acerca a la cresta.",
+      "Escenario de diseño extremo: ~210 mm en 5,5 h, unas 2,7 veces la lluvia diaria máxima registrada en 13 años (78,2 mm el 26/02/2020, estación HGPT-MT-01). La entrada crece, se activa el vertedero y el nivel se acerca a la cresta.",
     durationMin: 330,
     startOffsetNamo: -0.35,
     steps: [
       { atMin: 0, label: "Inicio de lluvia" },
-      { atMin: 30, label: "Lluvia intensa (> 40 mm/h)" },
+      { atMin: 30, label: "Lluvia intensa (> 40 mm/h; récord horario 36,2 mm)" },
       { atMin: 75, label: "Vertedero entra en funcionamiento" },
       { atMin: 150, label: "Nivel sobre NAME" },
       { atMin: 240, label: "Nivel cercano a cresta" },

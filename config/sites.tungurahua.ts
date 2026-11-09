@@ -7,6 +7,7 @@
  * cliente (Google Maps); las de la cortina son una estimación inicial editable.
  */
 import type { AreaVolumePoint, Role, SensorType, Thresholds } from "@/lib/domain/types";
+import { CLIMATOLOGIA } from "./climatologia.tungurahua";
 
 export interface SensorSeed {
   code: string;
@@ -204,6 +205,7 @@ export const SITES: SiteSeed[] = [
       ],
       altura_presa_m: 24.5,
       tipo_presa: "Materiales sueltos con núcleo impermeable (referencial)",
+      clima: CLIMATOLOGIA.CHQ,
     },
     cauce: [
       [CHQ_DAM[1], CHQ_DAM[0]],
@@ -256,6 +258,7 @@ export const SITES: SiteSeed[] = [
       fuentes: ["Estudio HEC-RAS 2D: onda por rotura llega a Ambato en ~2 h 20 min (140 min)"],
       altura_presa_m: 26,
       tipo_presa: "Materiales sueltos (referencial)",
+      clima: CLIMATOLOGIA.MLC,
     },
     cauce: [
       [MLC_DAM[1], MLC_DAM[0]],

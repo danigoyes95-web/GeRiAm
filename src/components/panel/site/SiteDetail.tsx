@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState, Pill, SegmentedControl, Skeleton } from "@/components/ui/misc";
 import { TimeSeriesChart, type ChartLine } from "@/components/charts/TimeSeriesChart";
 import { CameraMosaic } from "@/components/cameras/CameraMosaic";
+import { ClimateCard, type ClimaView } from "./ClimateCard";
 import { usePanel } from "@/components/panel/PanelContext";
 import { isStale, useOrgLive, useSiteSummaries } from "@/lib/data/live";
 import { useRainTotals, useSeries, type SeriesPoint } from "@/lib/data/series";
@@ -76,7 +77,7 @@ export function SiteDetail({ slug }: { slug: string }) {
   const S = series.data ?? {};
   const cota = nivel?.last_value ?? null;
   const vol = cota !== null ? volumeAt(siteCurve(site), cota) : null;
-  const meta = (site.metadata ?? {}) as { usos?: string[]; fuentes?: string[]; altura_presa_m?: number; tipo_presa?: string; referencial?: boolean };
+  const meta = (site.metadata ?? {}) as { usos?: string[]; fuentes?: string[]; altura_presa_m?: number; tipo_presa?: string; referencial?: boolean; clima?: ClimaView };
   const H = cota !== null ? cota - Number(site.cota_vertedero) : null;
   const q24 = (s: Sensor | undefined) => {
     const arr = s ? (S[s.id] ?? []).filter((p) => p.ts > Date.now() - 86400_000) : [];
@@ -166,6 +167,7 @@ export function SiteDetail({ slug }: { slug: string }) {
               </p>
             </CardBody>
           </Card>
+          {meta.clima && <ClimateCard clima={meta.clima} />}
           <Card>
             <CardHeader title="Ficha técnica" subtitle={meta.referencial ? "Valores referenciales · a validar con el GPT" : undefined} icon={<FileText />} />
             <CardBody className="space-y-1.5 text-xs">

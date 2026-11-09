@@ -312,6 +312,14 @@ export function BasinMap({
         el.setAttribute("aria-label", `${s.site.name}: ${LEVELS[s.level].label}`);
         el.innerHTML = siteMarkerHtml(s, selected?.kind === "site" && selected.id === s.site.id);
         add(el, s.site.lng, s.site.lat, { kind: "site", id: s.site.id }, "bottom");
+        const clima = (s.site.metadata as { clima?: { estacion?: string; lat?: number; lng?: number } } | null)?.clima;
+        if (!compact && clima?.lat && clima?.lng) {
+          const st = document.createElement("div");
+          st.className = "geriam-station";
+          st.title = `Estación meteorológica ${clima.estacion} (red HGPT)`;
+          st.innerHTML = `<span class="gs-dot"></span><span class="gs-label">${clima.estacion}</span>`;
+          markersRef.current.push(new mapboxgl.Marker({ element: st, anchor: "left" }).setLngLat([clima.lng, clima.lat]).addTo(map));
+        }
         if (!compact) {
           const dam = document.createElement("div");
           dam.className = "geriam-dam";
@@ -407,7 +415,7 @@ export function BasinMap({
         </div>
       )}
       {topo && !quiet && !failed && (
-        <div className="pointer-events-none absolute top-3 left-1/2 hidden -translate-x-1/2 rounded bg-bg/80 px-2 py-1 text-[10px] text-fg-muted backdrop-blur sm:block" role="note">
+        <div className="pointer-events-none absolute top-3 right-14 hidden rounded bg-bg/80 px-2 py-1 text-[10px] text-fg-muted backdrop-blur sm:block" role="note">
           Vista topográfica · imagen satelital no disponible
         </div>
       )}
