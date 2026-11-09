@@ -184,6 +184,7 @@ export function toOpenAlert(a: AlertRow, startedAtOverride?: number): OpenAlert 
     lastTriggeredAt: new Date(a.last_triggered_at).getTime(),
     startedAt: startedAtOverride ?? new Date(a.started_at).getTime(),
     type: a.type as OpenAlert["type"],
+    simStartedMin: ((a.trigger_values ?? {}) as { sim_started_min?: number }).sim_started_min,
   };
 }
 
