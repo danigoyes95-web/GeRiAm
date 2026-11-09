@@ -49,6 +49,28 @@ export interface BasinMapProps {
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
+/**
+ * Respaldo cuando la cuenta de Mapbox no entrega teselas raster (satélite / relieve):
+ * estilo topográfico vectorial + relieve 3D de Terrain Tiles (AWS Open Data, Terrarium).
+ */
+const STYLE_SATELLITE = "mapbox://styles/mapbox/satellite-streets-v12";
+const STYLE_TOPO = "mapbox://styles/mapbox/outdoors-v12";
+const RASTER_FLAG = "geriam-map-raster-blocked";
+function rasterBlocked(): boolean {
+  try {
+    return sessionStorage.getItem(RASTER_FLAG) === "1";
+  } catch {
+    return false;
+  }
+}
+function markRasterBlocked() {
+  try {
+    sessionStorage.setItem(RASTER_FLAG, "1");
+  } catch {
+    /* noop */
+  }
+}
+
 function circlePolygon(lng: number, lat: number, radiusM: number, steps = 64): GeoJSON.Feature<GeoJSON.Polygon> {
   const coords: [number, number][] = [];
   const dLat = radiusM / 110574;
@@ -101,6 +123,7 @@ export function BasinMap({
   const [ready, setReady] = useState(false);
   const [dataNonce, setDataNonce] = useState(0);
   const [failed, setFailed] = useState<string | null>(TOKEN ? null : "Falta NEXT_PUBLIC_MAPBOX_TOKEN");
+  const [topo, setTopo] = useState(false);
   const onSelectRef = useRef(onSelect);
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -115,9 +138,11 @@ export function BasinMap({
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled || !containerRef.current) return;
       mapboxgl.accessToken = TOKEN;
+      let fallback = rasterBlocked();
+      if (fallback) setTopo(true);
       const map = new mapboxgl.Map({
         container: containerRef.current,
-        style: "mapbox://styles/mapbox/satellite-streets-v12",
+        style: fallback ? STYLE_TOPO : STYLE_SATELLITE,
         center: [center.lng, center.lat],
         zoom: center.zoom,
         pitch: center.pitch,
@@ -130,15 +155,41 @@ export function BasinMap({
       mapRef.current = map;
       if (interactive) map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
       map.on("error", (e) => {
-        const msg = (e as { error?: { message?: string } }).error?.message ?? "";
-        if (/access token|401|403/i.test(msg)) setFailed("Token de Mapbox inválido o restringido");
+        const ev = e as { sourceId?: string; error?: { message?: string; status?: number } };
+        const msg = ev.error?.message ?? "";
+        const status = ev.error?.status;
+        const rasterSource = ev.sourceId === "mapbox-satellite" || ev.sourceId === "mapbox-dem";
+        if (rasterSource && (status === 429 || status === 403 || status === 401 || /too many|forbidden/i.test(msg))) {
+          if (!fallback) {
+            fallback = true;
+            markRasterBlocked();
+            setTopo(true);
+            console.warn("[mapa] Mapbox no entrega teselas raster; se usa vista topográfica + relieve abierto");
+            if (map.getTerrain()) map.setTerrain(null);
+            map.setStyle(STYLE_TOPO);
+          }
+          return;
+        }
+        if (/access token/i.test(msg) || status === 401) setFailed("Token de Mapbox inválido o restringido");
       });
       // "style.load" puede dispararse más de una vez (p. ej. al localizar el estilo):
       // todo lo que se agrega aquí debe ser idempotente.
       const setupStyle = () => {
         try {
           if (!map.getSource("mapbox-dem")) {
-            map.addSource("mapbox-dem", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
+            map.addSource(
+              "mapbox-dem",
+              fallback
+                ? {
+                    type: "raster-dem",
+                    tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+                    encoding: "terrarium",
+                    tileSize: 256,
+                    maxzoom: 14,
+                    attribution: "Relieve: Terrain Tiles (AWS Open Data)",
+                  }
+                : { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 },
+            );
           }
           map.setTerrain({ source: "mapbox-dem", exaggeration: 1.45 });
           map.setFog({
@@ -353,6 +404,11 @@ export function BasinMap({
             <span className="size-6 animate-spin rounded-full border-2 border-accent/30 border-t-accent" aria-hidden />
             Cargando relieve 3D de la cuenca…
           </div>
+        </div>
+      )}
+      {topo && !quiet && !failed && (
+        <div className="pointer-events-none absolute top-3 left-1/2 hidden -translate-x-1/2 rounded bg-bg/80 px-2 py-1 text-[10px] text-fg-muted backdrop-blur sm:block" role="note">
+          Vista topográfica · imagen satelital no disponible
         </div>
       )}
       {failed && !quiet && (
