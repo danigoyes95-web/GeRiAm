@@ -1,18 +1,15 @@
-import Link from "next/link";
-import { Logo } from "@/design";
-import { Button } from "@/components/ui/button";
+import type { Metadata } from "next";
+import { Portal } from "@/components/portal/Portal";
+import { fetchPublicStatus } from "@/lib/data/public";
 
-export default function Portal() {
-  return (
-    <main className="grid min-h-dvh place-items-center bg-grid px-4">
-      <div className="text-center">
-        <Logo tagline="Gestión de Riesgos Ambato" className="justify-center" />
-        <div className="mt-6">
-          <Button asChild variant="primary">
-            <Link href="/login">Ingresar</Link>
-          </Button>
-        </div>
-      </div>
-    </main>
-  );
+export const revalidate = 30;
+
+export const metadata: Metadata = {
+  title: "GeRiAm — Monitoreo y alerta temprana de embalses",
+  description: "Estado en vivo de los embalses de la cuenca alta del río Ambato, niveles de alerta, protocolos y acceso del personal.",
+};
+
+export default async function HomePage() {
+  const status = await fetchPublicStatus();
+  return <Portal initial={status} />;
 }
