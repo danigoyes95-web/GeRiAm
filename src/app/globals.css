@@ -426,3 +426,30 @@
   padding: 2px 4px;
   border-radius: 3px;
 }
+
+/* Impresión de reportes: solo el documento #reporte, en blanco */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color-scheme: light;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #reporte,
+  #reporte * {
+    visibility: visible;
+  }
+  #reporte {
+    position: absolute;
+    inset: 0 0 auto 0;
+    padding: 14mm !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

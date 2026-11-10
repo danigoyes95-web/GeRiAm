@@ -29,7 +29,7 @@ export const PANEL_NAV_ALL: NavItem[] = [
   { href: "/panel/alertas", label: "Alertas", icon: BellRing },
   { href: "/panel/camaras", label: "Cámaras", icon: Video },
   { href: "/panel/simulacro", label: "Simulacro", icon: Siren, roles: ["admin", "operador"] },
-  { pending: true, href: "/panel/reportes", label: "Reportes", icon: FileText },
+  { href: "/panel/reportes", label: "Reportes", icon: FileText },
   { href: "/panel/bitacora", label: "Bitácora", icon: ScrollText, roles: ["admin", "operador", "observador"] },
   { pending: true, href: "/panel/estado-sistema", label: "Estado del sistema", icon: Activity },
   { pending: true, href: "/panel/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
