@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Layers, Mountain, Navigation, RadioTower, Video } from "lucide-react";
 import { BasinMap, type MapSelection } from "@/components/map/BasinMap";
 import { DrillHud, useDrillScene } from "@/components/drill/DrillEffects";
+import { RiverForecast } from "@/components/inamhi/RiverForecast";
 import { usePanel } from "@/components/panel/PanelContext";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -201,6 +202,8 @@ export function Overview() {
           </div>
         </Card>
       </div>
+      {/* Pronóstico hidrológico del INAMHI (GEOGLOWS) para el río Ambato */}
+      <RiverForecast reaches={["ambato", "pasa", "CHQ", "MLC"]} showWarnings />
     </div>
   );
 }
