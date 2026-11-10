@@ -11,6 +11,7 @@ export function CameraMosaic({
   cols = 2,
   onExpand,
   snapshotMode,
+  compact,
   className,
 }: {
   cameras: Camera[];
@@ -20,10 +21,17 @@ export function CameraMosaic({
   cols?: 1 | 2 | 3;
   onExpand?: (c: Camera) => void;
   snapshotMode?: boolean;
+  compact?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn("grid gap-2", cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3", className)}>
+    <div
+      className={cn(
+        "grid gap-2",
+        cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3",
+        className,
+      )}
+    >
       {cameras.map((c) => {
         const site = sites.find((s) => s.id === c.site_id);
         return (
@@ -37,6 +45,7 @@ export function CameraMosaic({
             demoClip={c.demo_clip}
             online={c.status === "online" && linkOnline(c.site_id)}
             snapshotMode={snapshotMode}
+            compact={compact}
             onExpand={onExpand ? () => onExpand(c) : undefined}
           />
         );

@@ -193,6 +193,7 @@ export function Overview() {
                 sites={data.sites}
                 entity={panel.branding.entity ?? panel.orgName}
                 linkOnline={(id) => summaries.find((s) => s.site.id === id)?.linkOnline ?? true}
+                compact
               />
             ) : (
               <Skeleton className="aspect-video w-full" />
