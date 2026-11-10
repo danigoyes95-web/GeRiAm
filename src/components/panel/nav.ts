@@ -31,8 +31,8 @@ export const PANEL_NAV_ALL: NavItem[] = [
   { href: "/panel/simulacro", label: "Simulacro", icon: Siren, roles: ["admin", "operador"] },
   { href: "/panel/reportes", label: "Reportes", icon: FileText },
   { href: "/panel/bitacora", label: "Bitácora", icon: ScrollText, roles: ["admin", "operador", "observador"] },
-  { pending: true, href: "/panel/estado-sistema", label: "Estado del sistema", icon: Activity },
-  { pending: true, href: "/panel/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
+  { href: "/panel/estado-sistema", label: "Estado del sistema", icon: Activity, roles: ["admin", "operador", "observador"] },
+  { href: "/panel/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
 
 export const PANEL_NAV: NavItem[] = PANEL_NAV_ALL.filter((i) => !i.pending);
