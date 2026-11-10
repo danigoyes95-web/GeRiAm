@@ -32,9 +32,9 @@ function thrLines(sensor: Sensor | undefined, decimals = 2): ChartLine[] {
   const t = sensor ? sensorThresholds(sensor) : null;
   if (!t) return [];
   const out: ChartLine[] = [];
-  if (t.amarilla !== undefined) out.push({ value: Number(t.amarilla.toFixed(decimals)), label: "Amarilla", color: "#facc15" });
-  if (t.naranja !== undefined) out.push({ value: t.naranja, label: "Naranja", color: "#fb923c" });
-  if (t.roja !== undefined) out.push({ value: t.roja, label: "Roja", color: "#ef4444" });
+  if (t.amarilla !== undefined) out.push({ value: Number(t.amarilla.toFixed(decimals)), label: "Amarilla", color: "#facc15", zone: true });
+  if (t.naranja !== undefined) out.push({ value: t.naranja, label: "Naranja", color: "#fb923c", zone: true });
+  if (t.roja !== undefined) out.push({ value: t.roja, label: "Roja", color: "#ef4444", zone: true });
   return out;
 }
 
@@ -236,7 +236,7 @@ export function SiteDetail({ slug }: { slug: string }) {
                     { name: "PZ-01 cuerpo", data: pts(pz1 ? S[pz1.id] : undefined), color: COLORS.pz1, decimals: 1, unit: "kPa" },
                     { name: "PZ-02 cimentación", data: pts(pz2 ? S[pz2.id] : undefined), color: COLORS.pz2, decimals: 1, unit: "kPa" },
                   ]}
-                  lines={thrLines(pz1, 0).slice(0, 1)}
+                  lines={thrLines(pz1, 0).slice(0, 1).map((l) => ({ ...l, zone: false, label: "Amarilla PZ-01" }))}
                 />
               </CardBody>
             </Card>
