@@ -272,6 +272,27 @@ export function BasinMap({
               },
             });
           }
+          // Zonas de susceptibilidad a inundación de la SNGR (GeoServer INAMHI–GEOGLOWS), visibles durante la crecida
+          if (!map.getSource("sngr-flood"))
+            map.addSource("sngr-flood", {
+              type: "raster",
+              tiles: [
+                "https://services.geoglows.org/geoserver/ecuador/wms?service=WMS&request=GetMap&version=1.1.1&layers=ecuador:flood2&styles=&format=image/png&transparent=true&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=256&height=256",
+              ],
+              tileSize: 256,
+              attribution: "Susceptibilidad a inundación: SNGR · INAMHI–GEOGLOWS",
+            });
+          if (!map.getLayer("sngr-flood"))
+            map.addLayer(
+              {
+                id: "sngr-flood",
+                type: "raster",
+                source: "sngr-flood",
+                layout: { visibility: "none" },
+                paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 1200, delay: 0 } },
+              },
+              map.getLayer("cauce-glow") ? "cauce-glow" : undefined,
+            );
           // Simulacro: frente de crecida (line-gradient requiere lineMetrics) y pulso en la presa
           if (!map.getSource("flood"))
             map.addSource("flood", { type: "geojson", data: empty, lineMetrics: true });
@@ -514,6 +535,14 @@ export function BasinMap({
         : [],
     });
   }, [ready, sceneSite, floodOn, sites]);
+
+  // zonas inundables SNGR: aparecen cuando sale la crecida
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !alive(map) || !map.getLayer("sngr-flood")) return;
+    map.setLayoutProperty("sngr-flood", "visibility", floodOn ? "visible" : "none");
+    map.setPaintProperty("sngr-flood", "raster-opacity", floodOn ? 0.72 : 0);
+  }, [ready, floodOn]);
 
   // lluvia 3D y niebla de tormenta
   const rainBucket = scene ? Math.round(Math.min(scene.rainMmH, 60) / 5) : 0;

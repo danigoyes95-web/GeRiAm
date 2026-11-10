@@ -1,6 +1,5 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
 import { LineChart } from "echarts/charts";
@@ -13,7 +12,8 @@ import { formatDateTime, formatNumber } from "@/lib/format";
 import { useTheme } from "@/lib/hooks/useBrowser";
 import { useNow } from "@/lib/hooks/useNow";
 import { cn } from "@/lib/utils";
-import type { MeteoWarning, ReachKey, RiverForecast as Forecast } from "@/lib/inamhi/geoglows";
+import type { ReachKey, RiverForecast as Forecast } from "@/lib/inamhi/geoglows";
+import { useInamhi, type InamhiPayload } from "./useInamhi";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, LegendComponent, CanvasRenderer]);
 
@@ -36,13 +36,6 @@ const dayHour = new Intl.DateTimeFormat("es-EC", {
   hour12: false,
   timeZone: TZ,
 });
-
-interface Payload {
-  forecast: Forecast | null;
-  forecastError: string | null;
-  warnings: { warnings: MeteoWarning[]; last: MeteoWarning | null } | null;
-  source: string;
-}
 
 function status(f: Forecast) {
   if (f.exceeds.avg)
@@ -253,7 +246,7 @@ function ForecastChart({ f, height }: { f: Forecast; height: number }) {
   );
 }
 
-function WarningsStrip({ w }: { w: Payload["warnings"] }) {
+function WarningsStrip({ w }: { w: InamhiPayload["warnings"] }) {
   if (!w) return null;
   const relevant = w.warnings.filter((x) => x.affects.length > 0);
   if (relevant.length) {
@@ -313,20 +306,11 @@ export function RiverForecast({
   className?: string;
 }) {
   const [reach, setReach] = useState<ReachKey>(initial ?? reaches[0]);
-  const q = useQuery({
-    queryKey: ["inamhi", reach],
-    staleTime: 10 * 60_000,
-    refetchInterval: 30 * 60_000,
-    queryFn: async () => {
-      const r = await fetch(`/api/inamhi?reach=${reach}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return (await r.json()) as Payload;
-    },
-  });
+  const q = useInamhi(reach);
   const f = q.data?.forecast ?? null;
   const st = f ? status(f) : null;
   return (
-    <Card className={className}>
+    <Card className={cn("min-w-0", className)}>
       <CardHeader
         title="Pronóstico de caudal · próximos 15 días"
         subtitle={
@@ -338,7 +322,7 @@ export function RiverForecast({
       />
       <div className="space-y-3 p-3 sm:p-4">
         {reaches.length > 1 && (
-          <div className="-mx-1 overflow-x-auto px-1">
+          <div className="-mx-1 max-w-full overflow-x-auto px-1">
             <SegmentedControl<ReachKey>
               label="Tramo del río"
               value={reach}

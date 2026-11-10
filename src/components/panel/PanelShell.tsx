@@ -11,7 +11,7 @@ import { PANEL_NAV } from "./nav";
 import { LiveClock } from "./LiveClock";
 import { StarlinkStrip } from "./StarlinkStrip";
 import { DrillBanner } from "@/components/DrillBanner";
-import { DrillEffects } from "@/components/drill/DrillEffects";
+import { DrillEffects, DrillPrologue } from "@/components/drill/DrillEffects";
 import { globalLevel, useOrgLive } from "@/lib/data/live";
 import { useLocalStorage } from "@/lib/hooks/useBrowser";
 import { ROLE_LABEL, type Role } from "@/lib/domain/types";
@@ -23,7 +23,17 @@ export interface PanelUser {
   role: Role;
 }
 
-export function PanelShell({ user, branding, orgName, children }: { user: PanelUser; branding: Branding; orgName: string; children: React.ReactNode }) {
+export function PanelShell({
+  user,
+  branding,
+  orgName,
+  children,
+}: {
+  user: PanelUser;
+  branding: Branding;
+  orgName: string;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const [navPref, setNavPref] = useLocalStorage("geriam-nav", "open");
   const collapsed = navPref === "collapsed";
@@ -55,24 +65,35 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
     href === "/panel" ? pathname === "/panel" : pathname.startsWith(href.replace(/\/chiquiurco$/, ""));
 
   return (
-    <div className="flex min-h-dvh flex-col bg-bg">
+    <div className="bg-bg flex min-h-dvh flex-col">
       <DrillBanner />
       <DrillEffects />
+      <DrillPrologue />
       <div className="flex min-h-0 flex-1">
         {!roomMode && (
           <aside
             className={cn(
-              "sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-bg-elevated transition-[width] duration-200 md:flex",
+              "border-border bg-bg-elevated sticky top-0 hidden h-dvh shrink-0 flex-col border-r transition-[width] duration-200 md:flex",
               collapsed ? "w-[60px]" : "w-[232px]",
             )}
             aria-label="Navegación principal"
           >
-            <div className={cn("flex h-14 items-center border-b border-border", collapsed ? "justify-center" : "px-4")}>
+            <div
+              className={cn(
+                "border-border flex h-14 items-center border-b",
+                collapsed ? "justify-center" : "px-4",
+              )}
+            >
               <Link href="/panel" aria-label="Inicio del panel">
-                <Logo compact={collapsed} tagline={branding.tagline} product={branding.product} color={branding.primary} />
+                <Logo
+                  compact={collapsed}
+                  tagline={branding.tagline}
+                  product={branding.product}
+                  color={branding.primary}
+                />
               </Link>
             </div>
-            <nav className="scrollbar-thin flex-1 overflow-y-auto p-2">
+            <nav className="flex-1 scrollbar-thin overflow-y-auto p-2">
               <ul className="space-y-0.5">
                 {items.map((it) => {
                   const Icon = it.icon;
@@ -86,10 +107,18 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
                         className={cn(
                           "group flex h-9 items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
                           collapsed ? "justify-center" : "px-2.5",
-                          active ? "bg-accent-soft text-fg" : "text-fg-muted hover:bg-surface-2 hover:text-fg",
+                          active
+                            ? "bg-accent-soft text-fg"
+                            : "text-fg-muted hover:bg-surface-2 hover:text-fg",
                         )}
                       >
-                        <Icon className={cn("size-4 shrink-0", active ? "text-accent" : "text-fg-faint group-hover:text-fg-muted")} aria-hidden />
+                        <Icon
+                          className={cn(
+                            "size-4 shrink-0",
+                            active ? "text-accent" : "text-fg-faint group-hover:text-fg-muted",
+                          )}
+                          aria-hidden
+                        />
                         {!collapsed && <span className="truncate">{it.label}</span>}
                       </Link>
                     </li>
@@ -97,10 +126,13 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
                 })}
               </ul>
             </nav>
-            <div className="border-t border-border p-2">
+            <div className="border-border border-t p-2">
               <Link
                 href="/app"
-                className={cn("flex h-9 items-center gap-2.5 rounded-md text-[13px] text-fg-muted hover:bg-surface-2 hover:text-fg", collapsed ? "justify-center" : "px-2.5")}
+                className={cn(
+                  "text-fg-muted hover:bg-surface-2 hover:text-fg flex h-9 items-center gap-2.5 rounded-md text-[13px]",
+                  collapsed ? "justify-center" : "px-2.5",
+                )}
                 title="Abrir app móvil"
               >
                 <Smartphone className="size-4" aria-hidden />
@@ -109,7 +141,10 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
               <button
                 type="button"
                 onClick={toggleNav}
-                className={cn("flex h-9 w-full items-center gap-2.5 rounded-md text-[13px] text-fg-muted hover:bg-surface-2 hover:text-fg", collapsed ? "justify-center" : "px-2.5")}
+                className={cn(
+                  "text-fg-muted hover:bg-surface-2 hover:text-fg flex h-9 w-full items-center gap-2.5 rounded-md text-[13px]",
+                  collapsed ? "justify-center" : "px-2.5",
+                )}
                 aria-label={collapsed ? "Expandir navegación" : "Contraer navegación"}
               >
                 {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
@@ -120,13 +155,15 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-bg/85 px-3 backdrop-blur-md sm:px-4">
+          <header className="border-border bg-bg/85 sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-3 backdrop-blur-md sm:px-4">
             <div className="md:hidden">
               <Logo compact />
             </div>
             <div className="hidden min-w-0 flex-col leading-tight lg:flex">
-              <span className="truncate text-[13px] font-semibold text-fg">{branding.entity ?? orgName}</span>
-              <span className="truncate text-[11px] text-fg-faint">{branding.unit ?? "Sala de operaciones"}</span>
+              <span className="text-fg truncate text-[13px] font-semibold">{branding.entity ?? orgName}</span>
+              <span className="text-fg-faint truncate text-[11px]">
+                {branding.unit ?? "Sala de operaciones"}
+              </span>
             </div>
             <div className="ml-auto flex items-center gap-2 sm:gap-4">
               <StarlinkStrip />
@@ -148,13 +185,19 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
                   {roomMode ? <X /> : <Monitor />}
                 </Button>
               </div>
-              <div className="hidden items-center gap-2 border-l border-border pl-3 xl:flex">
+              <div className="border-border hidden items-center gap-2 border-l pl-3 xl:flex">
                 <div className="text-right leading-tight">
-                  <div className="text-[12px] font-medium text-fg">{user.name}</div>
-                  <div className="text-[10.5px] text-fg-faint">{ROLE_LABEL[user.role]}</div>
+                  <div className="text-fg text-[12px] font-medium">{user.name}</div>
+                  <div className="text-fg-faint text-[10.5px]">{ROLE_LABEL[user.role]}</div>
                 </div>
                 <form action="/auth/signout" method="post">
-                  <Button type="submit" variant="ghost" size="icon-sm" aria-label="Cerrar sesión" title="Cerrar sesión">
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Cerrar sesión"
+                    title="Cerrar sesión"
+                  >
                     <LogOut />
                   </Button>
                 </form>
@@ -166,16 +209,22 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
           </main>
           {/* navegación móvil: 4 accesos + "Más" cuando hay más de 5 pantallas */}
           {!roomMode && (
-            <nav className="sticky bottom-0 z-30 border-t border-border bg-bg-elevated/95 backdrop-blur md:hidden" aria-label="Navegación">
+            <nav
+              className="border-border bg-bg-elevated/95 sticky bottom-0 z-30 border-t backdrop-blur md:hidden"
+              aria-label="Navegación"
+            >
               {moreOpen && (
-                <ul className="grid grid-cols-2 gap-1 border-b border-border p-2">
+                <ul className="border-border grid grid-cols-2 gap-1 border-b p-2">
                   {items.slice(4).map((it) => {
                     const Icon = it.icon;
                     return (
                       <li key={it.href}>
                         <Link
                           href={it.href}
-                          className={cn("flex items-center gap-2 rounded-md px-3 py-2.5 text-[13px]", isActive(it.href) ? "bg-accent-soft text-accent" : "text-fg-muted")}
+                          className={cn(
+                            "flex items-center gap-2 rounded-md px-3 py-2.5 text-[13px]",
+                            isActive(it.href) ? "bg-accent-soft text-accent" : "text-fg-muted",
+                          )}
                         >
                           <Icon className="size-4" aria-hidden />
                           {it.label}
@@ -190,7 +239,14 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
                   const Icon = it.icon;
                   const active = isActive(it.href);
                   return (
-                    <Link key={it.href} href={it.href} className={cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]", active ? "text-accent" : "text-fg-faint")}>
+                    <Link
+                      key={it.href}
+                      href={it.href}
+                      className={cn(
+                        "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]",
+                        active ? "text-accent" : "text-fg-faint",
+                      )}
+                    >
                       <Icon className="size-4.5" aria-hidden />
                       <span className="truncate">{it.label.split(" ")[0]}</span>
                     </Link>
@@ -203,10 +259,16 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
                     aria-expanded={moreOpen}
                     className={cn(
                       "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]",
-                      moreOpen || items.slice(4).some((i) => isActive(i.href)) ? "text-accent" : "text-fg-faint",
+                      moreOpen || items.slice(4).some((i) => isActive(i.href))
+                        ? "text-accent"
+                        : "text-fg-faint",
                     )}
                   >
-                    {moreOpen ? <X className="size-4.5" aria-hidden /> : <Menu className="size-4.5" aria-hidden />}
+                    {moreOpen ? (
+                      <X className="size-4.5" aria-hidden />
+                    ) : (
+                      <Menu className="size-4.5" aria-hidden />
+                    )}
                     <span>Más</span>
                   </button>
                 )}
