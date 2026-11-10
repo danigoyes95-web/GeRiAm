@@ -26,7 +26,7 @@ export const PANEL_NAV_ALL: NavItem[] = [
   { href: "/panel", label: "Vista general", icon: LayoutDashboard },
   { href: "/panel/embalses/chiquiurco", label: "Embalses", icon: Waves },
   { pending: true, href: "/panel/camaras", label: "Cámaras", icon: Video },
-  { pending: true, href: "/panel/red-sensores", label: "Red de sensores", icon: RadioTower },
+  { href: "/panel/red-sensores", label: "Red de sensores", icon: RadioTower },
   { href: "/panel/alertas", label: "Alertas", icon: BellRing },
   { href: "/panel/simulacro", label: "Simulacro", icon: Siren, roles: ["admin", "operador"] },
   { pending: true, href: "/panel/reportes", label: "Reportes", icon: FileText },
