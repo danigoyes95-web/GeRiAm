@@ -8,6 +8,8 @@
  */
 import type { AreaVolumePoint, Role, SensorType, Thresholds } from "@/lib/domain/types";
 import { CLIMATOLOGIA } from "./climatologia.tungurahua";
+// Cauce real aguas abajo de cada presa, trazado sobre el relieve (scripts/trace-cauce.py)
+import CAUCES from "./cauces.tungurahua.json";
 
 export interface SensorSeed {
   code: string;
@@ -114,21 +116,6 @@ export const DOWNSTREAM_POINTS = [
   { key: "ambato", name: "Ambato (ciudad)", kind: "ciudad", lat: -1.2491, lng: -78.6168, zone: "Z4", poblacion: 14500, verificado: false },
 ];
 
-const sharedCauceTail: [number, number][] = [
-  [-78.7905, -1.2215],
-  [-78.7735, -1.2372],
-  [-78.7552, -1.2508],
-  [-78.7398, -1.2622],
-  [-78.7262, -1.2685],
-  [-78.7105, -1.2641],
-  [-78.6952, -1.2553],
-  [-78.6794, -1.2468],
-  [-78.6623, -1.2471],
-  [-78.6441, -1.2502],
-  [-78.6301, -1.2497],
-  [-78.6168, -1.2491],
-];
-
 function lvl(namo: number, cresta: number): Thresholds {
   return {
     direction: "asc",
@@ -207,12 +194,7 @@ export const SITES: SiteSeed[] = [
       tipo_presa: "Materiales sueltos con núcleo impermeable (referencial)",
       clima: CLIMATOLOGIA.CHQ,
     },
-    cauce: [
-      [CHQ_DAM[1], CHQ_DAM[0]],
-      [-78.8061, -1.2121],
-      [-78.7988, -1.2168],
-      ...sharedCauceTail,
-    ],
+    cauce: CAUCES.CHQ as [number, number][],
     downstream: [
       { point: "pasa", distancia_km: 27, llegada_min: 50, transito_min: 125, fuente: "Estimación referencial (HEC-RAS 2D Chiquiurco–Pasa)" },
       { point: "quisapincha", distancia_km: 34, llegada_min: 92, transito_min: 210, fuente: "Estimación referencial" },
@@ -260,14 +242,7 @@ export const SITES: SiteSeed[] = [
       tipo_presa: "Materiales sueltos (referencial)",
       clima: CLIMATOLOGIA.MLC,
     },
-    cauce: [
-      [MLC_DAM[1], MLC_DAM[0]],
-      [-78.8231, -1.2016],
-      [-78.8146, -1.2094],
-      [-78.8061, -1.2121],
-      [-78.7988, -1.2168],
-      ...sharedCauceTail,
-    ],
+    cauce: CAUCES.MLC as [number, number][],
     downstream: [
       { point: "pasa", distancia_km: 29, llegada_min: 55, transito_min: 135, fuente: "Estimación referencial" },
       { point: "quisapincha", distancia_km: 36, llegada_min: 98, transito_min: 225, fuente: "Estimación referencial" },

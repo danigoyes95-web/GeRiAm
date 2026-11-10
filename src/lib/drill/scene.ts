@@ -30,6 +30,29 @@ export interface DrillScene {
 
 const RANK: Record<string, number> = { normal: 0, amarilla: 1, naranja: 2, roja: 3 };
 
+/** Fracción (0–1) del largo del cauce en el punto más cercano a (lng, lat). */
+export function progressAlong(line: [number, number][], lng: number, lat: number): number {
+  const k = Math.cos((lat * Math.PI) / 180);
+  let total = 0;
+  let best = Infinity;
+  let bestAt = 0;
+  for (let i = 0; i < line.length - 1; i++) {
+    const [ax, ay] = line[i];
+    const [bx, by] = line[i + 1];
+    const dx = (bx - ax) * k;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    const t = len ? Math.max(0, Math.min(1, (((lng - ax) * k) * dx + (lat - ay) * dy) / (len * len))) : 0;
+    const d = Math.hypot((ax + (bx - ax) * t - lng) * k, ay + (by - ay) * t - lat);
+    if (d < best) {
+      best = d;
+      bestAt = total + t * len;
+    }
+    total += len;
+  }
+  return total ? bestAt / total : 0;
+}
+
 export function drillScene(data: OrgLive | undefined, now: number): DrillScene | null {
   const drill = data?.drill;
   if (!data || !drill || (drill.status !== "activo" && drill.status !== "pausado")) return null;
@@ -57,24 +80,26 @@ export function drillScene(data: OrgLive | undefined, now: number): DrillScene |
   if (withEta) {
     const tv = (withEta.trigger_values ?? {}) as { sim_started_min?: number };
     const elapsed = Math.max(0, simMin - (tv.sim_started_min ?? simMin));
-    const routes = data.routes.filter((r) => r.site_id === site.id);
+    // Cada punto aguas abajo se proyecta sobre el cauce real: el frente de crecida llega a su
+    // marcador justo cuando su cuenta regresiva llega a cero.
+    const line = ((site.cauce_geojson as { coordinates?: [number, number][] } | null)?.coordinates ?? []) as [number, number][];
     const pairs: [number, number][] = [[0, 0]];
     for (const e of alertEta(withEta)) {
-      const km = routes.find((r) => r.point_id === e.point_id)?.distancia_km;
-      if (km !== null && km !== undefined) pairs.push([e.minutes, Number(km)]);
+      const p = data.points.find((x) => x.id === e.point_id);
+      if (p && line.length > 1) pairs.push([e.minutes, progressAlong(line, p.lng, p.lat)]);
     }
     pairs.sort((a, b) => a[0] - b[0]);
-    const maxKm = Math.max(...pairs.map((p) => p[1])) || 1;
-    let km = maxKm;
+    for (let i = 1; i < pairs.length; i++) pairs[i][1] = Math.max(pairs[i][1], pairs[i - 1][1]);
+    let f = 1;
     for (let i = 1; i < pairs.length; i++) {
       if (elapsed <= pairs[i][0]) {
-        const [m0, k0] = pairs[i - 1];
-        const [m1, k1] = pairs[i];
-        km = k0 + ((k1 - k0) * (elapsed - m0)) / Math.max(1, m1 - m0);
+        const [m0, f0] = pairs[i - 1];
+        const [m1, f1] = pairs[i];
+        f = f0 + ((f1 - f0) * (elapsed - m0)) / Math.max(1, m1 - m0);
         break;
       }
     }
-    flood = Math.min(1, Math.max(0.015, km / maxKm));
+    flood = Math.min(1, Math.max(0.01, f));
     etas = alertEta(withEta).flatMap((e) => {
       const p = data.points.find((x) => x.id === e.point_id);
       return p ? [{ name: e.name, lat: p.lat, lng: p.lng, remainingMin: e.minutes - elapsed }] : [];

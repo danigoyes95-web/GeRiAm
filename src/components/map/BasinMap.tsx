@@ -639,7 +639,7 @@ export function BasinMap({
           el.className = "geriam-eta";
           m = {
             el,
-            marker: new mapboxgl.Marker({ element: el, anchor: "bottom" })
+            marker: new mapboxgl.Marker({ element: el, anchor: "bottom", offset: [0, -26] })
               .setLngLat([e.lng, e.lat])
               .addTo(map),
           };
