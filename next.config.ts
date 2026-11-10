@@ -9,7 +9,7 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""} blob:`,
   "style-src 'self' 'unsafe-inline' https://api.mapbox.com",
-  "img-src 'self' data: blob: https://*.mapbox.com https://s3.amazonaws.com " + (supabaseUrl || ""),
+  "img-src 'self' data: blob: https://*.mapbox.com https://s3.amazonaws.com https://services.geoglows.org " + (supabaseUrl || ""),
   "media-src 'self' blob: data: https:",
   "font-src 'self' data:",
   `connect-src 'self' ${supabaseUrl} wss://${supabaseHost} https://*.mapbox.com https://events.mapbox.com https: blob:`,

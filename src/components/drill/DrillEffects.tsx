@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { AlertOctagon, CloudRain, Siren, Timer, Waves } from "lucide-react";
+import { AlertOctagon, CloudLightning, CloudRain, Radar, Siren, Timer, Waves } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { pollDrill, useOrgLive } from "@/lib/data/live";
-import { drillScene, type DrillScene } from "@/lib/drill/scene";
+import { drillScene, estimateAmbatoFlow, type DrillScene } from "@/lib/drill/scene";
+import { useInamhi } from "@/components/inamhi/useInamhi";
 import { useNow } from "@/lib/hooks/useNow";
 import { formatNumber } from "@/lib/format";
 import { SCENARIO_LABEL } from "@/components/DrillBanner";
@@ -151,6 +152,11 @@ export function DrillHud({ scene, className }: { scene: DrillScene; className?: 
         <Siren className="size-3.5 animate-pulse" aria-hidden /> SIMULACRO EN CURSO
       </div>
       <div className="mt-1 text-sm font-semibold">{SCENARIO_LABEL[scene.scenario] ?? scene.scenario}</div>
+      {scene.scenario === "tormenta" && (
+        <div className="border-lvl-naranja/60 bg-lvl-naranja/15 text-lvl-naranja mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold">
+          <CloudLightning className="size-3" aria-hidden /> Aviso INAMHI (simulado) · Muy Alto
+        </div>
+      )}
       <div className="text-[11px] text-white/70">{scene.siteName}</div>
       <div className="mt-2 flex items-baseline gap-2">
         <span className="tabular font-mono text-2xl font-bold">
@@ -192,6 +198,7 @@ export function DrillHud({ scene, className }: { scene: DrillScene; className?: 
           </div>
         </div>
       </div>
+      {scene.scenario === "tormenta" && <FlowEquivalence scene={scene} />}
       {ambato && (
         <div className="border-lvl-roja/50 bg-lvl-roja/15 mt-2 flex items-center justify-between rounded-md border px-2 py-1.5 text-[11px]">
           <span className="flex items-center gap-1">
@@ -202,6 +209,154 @@ export function DrillHud({ scene, className }: { scene: DrillScene; className?: 
           </b>
         </div>
       )}
+    </div>
+  );
+}
+
+const RP_T = [2, 10, 50, 100] as const;
+const RP_COL: Record<number, string> = { 2: "#facc15", 10: "#fb923c", 50: "#ef4444", 100: "#b91c1c" };
+
+/** Caudal estimado en Ambato comparado con los caudales de crecida (2–100 años) del INAMHI–GEOGLOWS. */
+function FlowEquivalence({ scene }: { scene: DrillScene }) {
+  const q = useInamhi("ambato");
+  const f = q.data?.forecast;
+  const rp = f?.returnPeriods;
+  if (!rp) return null;
+  const base = f?.series.find((p) => p.avg !== null)?.avg ?? 20;
+  const flow = estimateAmbatoFlow(scene, base);
+  const hit = [...RP_T].reverse().find((T) => flow >= rp[T]);
+  const top = rp[100] * 1.15;
+  const pct = (v: number) => `${Math.min(100, (v / top) * 100)}%`;
+  const label =
+    hit === 100
+      ? "supera la crecida de 100 años"
+      : hit
+        ? `≈ crecida de ${hit} años`
+        : "bajo la crecida de 2 años";
+  return (
+    <div className="mt-2 rounded-md bg-white/5 p-1.5 text-[11px]">
+      <div className="flex items-center justify-between gap-2 text-white/60">
+        <span className="flex items-center gap-1">
+          <Waves className="size-3" aria-hidden /> Caudal estimado en Ambato
+        </span>
+        <b className="tabular font-mono text-sm text-white">{formatNumber(flow, 0)} m³/s</b>
+      </div>
+      <div className="relative mt-1.5 h-1.5 rounded bg-white/10">
+        <div
+          className="absolute inset-y-0 left-0 rounded"
+          style={{
+            width: pct(flow),
+            background: hit ? RP_COL[hit] : "#38bdf8",
+            transition: "width .6s ease",
+          }}
+        />
+        {RP_T.map((T) => (
+          <span
+            key={T}
+            className="absolute -top-0.5 h-2.5 w-0.5 -translate-x-1/2 rounded"
+            style={{ left: pct(rp[T]), background: RP_COL[T] }}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2">
+        <span className="font-semibold" style={{ color: hit ? RP_COL[hit] : "#7dd3fc" }}>
+          {label}
+        </span>
+        <span className="text-[9.5px] text-white/45">umbrales INAMHI–GEOGLOWS</span>
+      </div>
+    </div>
+  );
+}
+
+const PROLOGUE = [
+  {
+    at: "T − 72 h",
+    icon: Radar,
+    title: "Pronóstico INAMHI–GEOGLOWS",
+    text: "El escenario extremo del río Ambato muestra un pico fuera de lo normal para la próxima semana.",
+  },
+  {
+    at: "T − 48 h",
+    icon: CloudLightning,
+    title: "Aviso meteorológico INAMHI · nivel Muy Alto",
+    text: "Lluvias, tormentas y viento. El polígono del aviso cubre Chiquiurco, Mulacorral, Pasa y Ambato.",
+  },
+  {
+    at: "T − 6 h",
+    icon: Siren,
+    title: "GeRiAm en vigilancia reforzada",
+    text: "La sala de operaciones confirma el aviso y los técnicos de zona quedan notificados.",
+  },
+  {
+    at: "T 0",
+    icon: CloudRain,
+    title: "Empieza la tormenta sobre el páramo",
+    text: "A partir de aquí, todo lo que ven lo detectan los sensores en tiempo real.",
+  },
+];
+const STEP_S = 4.5;
+
+/** Prólogo del simulacro de tormenta: del pronóstico y el aviso del INAMHI a la primera gota (≈18 s). */
+export function DrillPrologue() {
+  const scene = useDrillScene();
+  const now = useNow(250);
+  const [skipped, setSkipped] = useState<string | null>(null);
+  if (!scene || scene.scenario !== "tormenta" || !now || skipped === scene.drillId) return null;
+  const elapsed = (now - scene.startedAt) / 1000;
+  if (elapsed < 0 || elapsed > PROLOGUE.length * STEP_S + 0.8) return null;
+  const step = Math.min(PROLOGUE.length - 1, Math.floor(elapsed / STEP_S));
+  return (
+    <div
+      className="geriam-prologue"
+      role="dialog"
+      aria-label="Prólogo del simulacro"
+      onClick={() => setSkipped(scene.drillId)}
+    >
+      <div className="relative w-full max-w-lg min-w-0 px-5">
+        <div className="text-lvl-amarilla mb-4 flex items-center justify-between text-[11px] font-bold tracking-[0.2em]">
+          <span>SIMULACRO · ANTES DE LA TORMENTA</span>
+          <span className="font-medium tracking-normal text-white/50">Toque para saltar</span>
+        </div>
+        <ol className="space-y-3">
+          {PROLOGUE.map((p, i) => {
+            const Icon = p.icon;
+            const state = i < step ? "done" : i === step ? "now" : "next";
+            return (
+              <li
+                key={p.at}
+                className={cn(
+                  "flex gap-3 rounded-xl border p-3 transition-all duration-500",
+                  state === "now"
+                    ? "border-cyan-300/60 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,.25)]"
+                    : state === "done"
+                      ? "border-white/10 bg-white/5 opacity-70"
+                      : "border-white/5 opacity-25",
+                )}
+              >
+                <div
+                  className={cn(
+                    "grid size-10 shrink-0 place-items-center rounded-full",
+                    state === "now" ? "bg-cyan-400 text-[#04121a]" : "bg-white/10 text-white/70",
+                  )}
+                >
+                  <Icon className="size-5" aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <div className="tabular font-mono text-[11px] font-bold text-cyan-300">{p.at}</div>
+                  <div className="text-[14.5px] font-semibold text-white">{p.title}</div>
+                  <div className="text-[12.5px] text-white/70">{p.text}</div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="mt-4 h-1 overflow-hidden rounded bg-white/10">
+          <div
+            className="h-full bg-cyan-400"
+            style={{ width: `${Math.min(100, (elapsed / (PROLOGUE.length * STEP_S)) * 100)}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

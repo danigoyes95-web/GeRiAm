@@ -26,6 +26,28 @@ export interface DrillScene {
   etas: { name: string; lat: number; lng: number; remainingMin: number }[];
   /** alerta más grave del simulacro (para el aviso a pantalla completa) */
   topAlert: Alert | null;
+  /** inicio real del simulacro (ms) */
+  startedAt: number;
+  /** lluvia media de la última hora simulada (mm/h) */
+  rainAvg60: number;
+  /** caudal que sale de la presa: descarga + vertedero (m³/s) */
+  damOutflow: number | null;
+}
+
+/** Cuenca intermedia entre las presas y Ambato que aporta escorrentía (km², referencial). */
+const INTERMEDIATE_KM2 = 45;
+/** Coeficiente de escorrentía del páramo saturado (referencial). */
+const RUNOFF_C = 0.35;
+
+/**
+ * Caudal estimado en Ambato durante el simulacro: caudal base del río (pronóstico INAMHI–GEOGLOWS)
+ * + salida de la presa atenuada en el tránsito + escorrentía de la cuenca intermedia (método racional).
+ * Es una estimación didáctica del simulacro, no un modelo hidráulico.
+ */
+export function estimateAmbatoFlow(scene: DrillScene, baseFlow: number): number {
+  const dam = (scene.damOutflow ?? 0) * 0.85;
+  const runoff = (RUNOFF_C * scene.rainAvg60 * INTERMEDIATE_KM2) / 3.6;
+  return Math.round((baseFlow + dam + runoff) * 10) / 10;
 }
 
 const RANK: Record<string, number> = { normal: 0, amarilla: 1, naranja: 2, roja: 3 };
@@ -42,7 +64,7 @@ export function progressAlong(line: [number, number][], lng: number, lat: number
     const dx = (bx - ax) * k;
     const dy = by - ay;
     const len = Math.hypot(dx, dy);
-    const t = len ? Math.max(0, Math.min(1, (((lng - ax) * k) * dx + (lat - ay) * dy) / (len * len))) : 0;
+    const t = len ? Math.max(0, Math.min(1, ((lng - ax) * k * dx + (lat - ay) * dy) / (len * len))) : 0;
     const d = Math.hypot((ax + (bx - ax) * t - lng) * k, ay + (by - ay) * t - lat);
     if (d < best) {
       best = d;
@@ -82,7 +104,10 @@ export function drillScene(data: OrgLive | undefined, now: number): DrillScene |
     const elapsed = Math.max(0, simMin - (tv.sim_started_min ?? simMin));
     // Cada punto aguas abajo se proyecta sobre el cauce real: el frente de crecida llega a su
     // marcador justo cuando su cuenta regresiva llega a cero.
-    const line = ((site.cauce_geojson as { coordinates?: [number, number][] } | null)?.coordinates ?? []) as [number, number][];
+    const line = ((site.cauce_geojson as { coordinates?: [number, number][] } | null)?.coordinates ?? []) as [
+      number,
+      number,
+    ][];
     const pairs: [number, number][] = [[0, 0]];
     for (const e of alertEta(withEta)) {
       const p = data.points.find((x) => x.id === e.point_id);
@@ -107,6 +132,13 @@ export function drillScene(data: OrgLive | undefined, now: number): DrillScene |
   }
 
   const nivelSensor = data.sensors.find((s) => s.site_id === site.id && s.type === "nivel_radar");
+  const qoutSensor = data.sensors.find((s) => s.site_id === site.id && s.type === "caudal_salida");
+  let rainAvg60 = 0;
+  if (def) {
+    for (let k = 0; k <= 6; k++)
+      rainAvg60 += def.at(Math.max(0, Math.min(simMin, def.durationMin) - k * 10)).forcing.rainMmH ?? 0;
+    rainAvg60 /= 7;
+  }
   return {
     drillId: drill.id,
     scenario: drill.scenario,
@@ -125,5 +157,11 @@ export function drillScene(data: OrgLive | undefined, now: number): DrillScene |
     flood,
     etas,
     topAlert: top,
+    startedAt: new Date(drill.started_at).getTime(),
+    rainAvg60,
+    damOutflow:
+      qoutSensor?.last_value === null || qoutSensor?.last_value === undefined
+        ? null
+        : Number(qoutSensor.last_value) / 1000,
   };
 }

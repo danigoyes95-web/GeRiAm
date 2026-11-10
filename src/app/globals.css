@@ -524,3 +524,20 @@
 @media (prefers-reduced-motion: reduce) {
   .geriam-vignette, .geriam-flash, .geriam-flash::before, .geriam-eta { animation: none !important; }
 }
+
+/* Simulacro: prólogo antes de la tormenta */
+.geriam-prologue {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 0 max(16px, env(safe-area-inset-bottom, 0px));
+  background: radial-gradient(ellipse at center, rgba(8, 47, 73, 0.92), rgba(4, 8, 15, 0.98) 70%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: geriam-flash-in 0.4s ease-out both;
+}
