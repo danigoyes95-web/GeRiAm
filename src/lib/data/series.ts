@@ -11,7 +11,12 @@ export interface SeriesPoint {
 }
 
 /** Serie agregada (crudo + horario) por sensor. Respeta RLS. */
-export function useSeries(sensorIds: string[], hours: number, bucketS: number, opts?: { enabled?: boolean; refetchMs?: number }) {
+export function useSeries(
+  sensorIds: string[],
+  hours: number,
+  bucketS: number,
+  opts?: { enabled?: boolean; refetchMs?: number },
+) {
   const key = sensorIds.slice().sort().join(",");
   return useQuery({
     queryKey: ["series", key, hours, bucketS],
@@ -21,11 +26,30 @@ export function useSeries(sensorIds: string[], hours: number, bucketS: number, o
       const sb = getBrowserClient();
       const to = new Date();
       const from = new Date(to.getTime() - hours * 3600_000);
-      const { data, error } = await sb.rpc("series", { p_sensor_ids: sensorIds, p_from: from.toISOString(), p_to: to.toISOString(), p_bucket_s: bucketS });
-      if (error) throw new Error(error.message);
+      // Una consulta por sensor: PostgREST limita cada respuesta a 1.000 filas, y varios
+      // sensores juntos (p. ej. 11 × 96 puntos en 24 h) superaban ese límite y se cortaban.
+      const results = await Promise.all(
+        sensorIds.map((id) =>
+          sb.rpc("series", {
+            p_sensor_ids: [id],
+            p_from: from.toISOString(),
+            p_to: to.toISOString(),
+            p_bucket_s: bucketS,
+          }),
+        ),
+      );
       const out: Record<string, SeriesPoint[]> = {};
-      for (const r of data ?? []) {
-        (out[r.sensor_id] ??= []).push({ ts: new Date(r.ts).getTime(), value: r.value, min: r.vmin, max: r.vmax, sum: r.vsum });
+      for (const { data, error } of results) {
+        if (error) throw new Error(error.message);
+        for (const r of data ?? []) {
+          (out[r.sensor_id] ??= []).push({
+            ts: new Date(r.ts).getTime(),
+            value: r.value,
+            min: r.vmin,
+            max: r.vmax,
+            sum: r.vsum,
+          });
+        }
       }
       return out;
     },
@@ -40,18 +64,25 @@ export function useDrillSeries(drillId: string | null | undefined, sensorIds: st
     refetchInterval: 3_000,
     queryFn: async () => {
       const sb = getBrowserClient();
-      const { data, error } = await sb
-        .from("readings")
-        .select("sensor_id, ts, value, raw")
-        .eq("drill_run_id", drillId!)
-        .in("sensor_id", sensorIds)
-        .order("ts", { ascending: true })
-        .limit(5000);
-      if (error) throw new Error(error.message);
+      // Por sensor (límite de 1.000 filas por respuesta de PostgREST).
+      const results = await Promise.all(
+        sensorIds.map((id) =>
+          sb
+            .from("readings")
+            .select("sensor_id, ts, value, raw")
+            .eq("drill_run_id", drillId!)
+            .eq("sensor_id", id)
+            .order("ts", { ascending: true })
+            .limit(1000),
+        ),
+      );
       const out: Record<string, { simMin: number; value: number }[]> = {};
-      for (const r of data ?? []) {
-        const raw = (r.raw ?? {}) as { sim_min?: number };
-        (out[r.sensor_id] ??= []).push({ simMin: raw.sim_min ?? 0, value: r.value });
+      for (const { data, error } of results) {
+        if (error) throw new Error(error.message);
+        for (const r of data ?? []) {
+          const raw = (r.raw ?? {}) as { sim_min?: number };
+          (out[r.sensor_id] ??= []).push({ simMin: raw.sim_min ?? 0, value: r.value });
+        }
       }
       return out;
     },
