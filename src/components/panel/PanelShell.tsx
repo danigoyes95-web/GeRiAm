@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, Monitor, PanelLeftClose, PanelLeftOpen, Smartphone, X } from "lucide-react";
+import { LogOut, Menu, Monitor, PanelLeftClose, PanelLeftOpen, Smartphone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo, StatusBadge } from "@/design";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,12 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
   const [navPref, setNavPref] = useLocalStorage("geriam-nav", "open");
   const collapsed = navPref === "collapsed";
   const [roomMode, setRoomMode] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [moreAt, setMoreAt] = useState(pathname);
+  if (moreAt !== pathname) {
+    setMoreAt(pathname);
+    setMoreOpen(false);
+  }
   const { data } = useOrgLive();
   const level = globalLevel(data);
 
@@ -156,19 +162,53 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
           <main id="contenido" className="min-w-0 flex-1">
             {children}
           </main>
-          {/* navegación móvil */}
+          {/* navegación móvil: 4 accesos + "Más" cuando hay más de 5 pantallas */}
           {!roomMode && (
-            <nav className="sticky bottom-0 z-30 flex border-t border-border bg-bg-elevated/95 backdrop-blur md:hidden" aria-label="Navegación">
-              {items.slice(0, 5).map((it) => {
-                const Icon = it.icon;
-                const active = isActive(it.href);
-                return (
-                  <Link key={it.href} href={it.href} className={cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]", active ? "text-accent" : "text-fg-faint")}>
-                    <Icon className="size-4.5" aria-hidden />
-                    <span className="truncate">{it.label.split(" ")[0]}</span>
-                  </Link>
-                );
-              })}
+            <nav className="sticky bottom-0 z-30 border-t border-border bg-bg-elevated/95 backdrop-blur md:hidden" aria-label="Navegación">
+              {moreOpen && (
+                <ul className="grid grid-cols-2 gap-1 border-b border-border p-2">
+                  {items.slice(4).map((it) => {
+                    const Icon = it.icon;
+                    return (
+                      <li key={it.href}>
+                        <Link
+                          href={it.href}
+                          className={cn("flex items-center gap-2 rounded-md px-3 py-2.5 text-[13px]", isActive(it.href) ? "bg-accent-soft text-accent" : "text-fg-muted")}
+                        >
+                          <Icon className="size-4" aria-hidden />
+                          {it.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <div className="flex">
+                {(items.length > 5 ? items.slice(0, 4) : items).map((it) => {
+                  const Icon = it.icon;
+                  const active = isActive(it.href);
+                  return (
+                    <Link key={it.href} href={it.href} className={cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]", active ? "text-accent" : "text-fg-faint")}>
+                      <Icon className="size-4.5" aria-hidden />
+                      <span className="truncate">{it.label.split(" ")[0]}</span>
+                    </Link>
+                  );
+                })}
+                {items.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setMoreOpen((v) => !v)}
+                    aria-expanded={moreOpen}
+                    className={cn(
+                      "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]",
+                      moreOpen || items.slice(4).some((i) => isActive(i.href)) ? "text-accent" : "text-fg-faint",
+                    )}
+                  >
+                    {moreOpen ? <X className="size-4.5" aria-hidden /> : <Menu className="size-4.5" aria-hidden />}
+                    <span>Más</span>
+                  </button>
+                )}
+              </div>
             </nav>
           )}
         </div>
