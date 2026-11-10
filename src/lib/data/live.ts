@@ -86,8 +86,8 @@ function startRealtime(qc: QueryClient) {
   return sb
     .channel(channelName("org-live"))
     .on("postgres_changes", { event: "UPDATE", schema: "geriam", table: "sensors" }, (p) => {
-      const row = p.new as Sensor;
-      patch((d) => ({ ...d, sensors: d.sensors.map((s) => (s.id === row.id ? row : s)) }));
+      const row = p.new as Partial<Sensor> & { id: string };
+      patch((d) => ({ ...d, sensors: d.sensors.map((s) => (s.id === row.id ? ({ ...s, ...row } as Sensor) : s)) }));
     })
     .on("postgres_changes", { event: "*", schema: "geriam", table: "alerts" }, (p) => {
       if (p.eventType === "DELETE") {
@@ -95,11 +95,25 @@ function startRealtime(qc: QueryClient) {
         patch((d) => ({ ...d, alerts: d.alerts.filter((a) => a.id !== old.id) }));
         return;
       }
-      const row = p.new as Alert;
-      patch((d) => ({
-        ...d,
-        alerts: row.status === "resuelta" ? d.alerts.filter((a) => a.id !== row.id) : upsertById(d.alerts, row),
-      }));
+      // Realtime puede entregar filas incompletas (cargas grandes de eta/trigger_values):
+      // se combinan con la fila conocida y, si aún faltan campos clave, se relee la fila completa.
+      const row = p.new as Partial<Alert> & { id: string };
+      const apply = (full: Alert) =>
+        patch((d) => ({
+          ...d,
+          alerts: full.status === "resuelta" ? d.alerts.filter((a) => a.id !== full.id) : upsertById(d.alerts, full),
+        }));
+      const known = qc.getQueryData<OrgLive>(ORG_LIVE_KEY)?.alerts.find((a) => a.id === row.id);
+      const merged = { ...(known ?? {}), ...row } as Alert;
+      if (merged.level && merged.status && merged.title && merged.started_at) apply(merged);
+      if (!row.level || !row.title || !row.status || row.eta === undefined || row.trigger_values === undefined) {
+        void sb
+          .from("alerts")
+          .select("*")
+          .eq("id", row.id)
+          .maybeSingle()
+          .then(({ data }) => data && apply(data as Alert));
+      }
     })
     .on("postgres_changes", { event: "*", schema: "geriam", table: "drill_runs" }, (p) => {
       if (p.eventType === "DELETE") {
@@ -119,13 +133,43 @@ function startRealtime(qc: QueryClient) {
       }
     })
     .on("postgres_changes", { event: "UPDATE", schema: "geriam", table: "gateways" }, (p) => {
-      const row = p.new as Gateway;
-      patch((d) => ({ ...d, gateways: d.gateways.map((g) => (g.id === row.id ? row : g)) }));
+      const row = p.new as Partial<Gateway> & { id: string };
+      patch((d) => ({ ...d, gateways: d.gateways.map((g) => (g.id === row.id ? ({ ...g, ...row } as Gateway) : g)) }));
     })
     .subscribe();
 }
 
 /** Estado vivo de la organización: carga inicial + Realtime (sensores, alertas, simulacro, gateways). */
+let drillPoll: Promise<void> | null = null;
+/**
+ * Durante un simulacro los cambios llegan en ráfagas y Realtime no siempre los entrega a todos
+ * los clientes: se releen alertas abiertas, sensores del sitio y el simulacro (3 consultas livianas).
+ */
+export function pollDrill(qc: QueryClient, siteId: string) {
+  if (drillPoll) return drillPoll;
+  const sb = getBrowserClient();
+  drillPoll = (async () => {
+    const [alerts, sensors] = await Promise.all([
+      sb.from("alerts").select("*").neq("status", "resuelta").order("started_at", { ascending: false }).limit(200),
+      sb.from("sensors").select("*").eq("site_id", siteId),
+    ]);
+    qc.setQueryData<OrgLive>(ORG_LIVE_KEY, (d) => {
+      if (!d) return d;
+      const fresh = new Map((sensors.data ?? []).map((x) => [x.id, x as Sensor]));
+      return {
+        ...d,
+        alerts: alerts.error ? d.alerts : ((alerts.data ?? []) as Alert[]),
+        sensors: sensors.error ? d.sensors : d.sensors.map((x) => fresh.get(x.id) ?? x),
+        fetchedAt: Date.now(),
+      };
+    });
+    await refreshDrill(qc);
+  })().finally(() => {
+    drillPoll = null;
+  });
+  return drillPoll;
+}
+
 export function useOrgLive() {
   const qc = useQueryClient();
   const query = useQuery({ queryKey: ORG_LIVE_KEY, queryFn: fetchOrgLive, refetchInterval: 60_000 });
