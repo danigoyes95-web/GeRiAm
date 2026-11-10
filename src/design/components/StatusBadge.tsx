@@ -15,7 +15,7 @@ export function StatusBadge({
   pulse?: boolean;
   className?: string;
 }) {
-  const meta = LEVELS[level];
+  const meta = LEVELS[level] ?? LEVELS.sin_datos;
   const Icon = meta.icon;
   const shouldPulse = pulse ?? (level === "roja" || level === "naranja");
   return (
@@ -38,7 +38,7 @@ export function StatusBadge({
 }
 
 export function StatusDot({ level, className, ring = false }: { level: StatusLevel; className?: string; ring?: boolean }) {
-  const meta = LEVELS[level];
+  const meta = LEVELS[level] ?? LEVELS.sin_datos;
   return (
     <span className={cn("relative inline-flex size-2.5", className)} aria-label={meta.label} role="img">
       {ring && <span className={cn("absolute inset-0 rounded-full animate-ring", meta.dot)} />}

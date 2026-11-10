@@ -11,6 +11,7 @@ import { PANEL_NAV } from "./nav";
 import { LiveClock } from "./LiveClock";
 import { StarlinkStrip } from "./StarlinkStrip";
 import { DrillBanner } from "@/components/DrillBanner";
+import { DrillEffects } from "@/components/drill/DrillEffects";
 import { globalLevel, useOrgLive } from "@/lib/data/live";
 import { useLocalStorage } from "@/lib/hooks/useBrowser";
 import { ROLE_LABEL, type Role } from "@/lib/domain/types";
@@ -56,6 +57,7 @@ export function PanelShell({ user, branding, orgName, children }: { user: PanelU
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <DrillBanner />
+      <DrillEffects />
       <div className="flex min-h-0 flex-1">
         {!roomMode && (
           <aside

@@ -30,7 +30,7 @@ export interface AlertCardProps {
 }
 
 export function AlertCard({ level, title, siteName, description, status, startedAt, isDrill, footer, actions, onClick, compact, className, now }: AlertCardProps) {
-  const meta = LEVELS[level];
+  const meta = LEVELS[level] ?? LEVELS.sin_datos;
   return (
     <article
       className={cn(

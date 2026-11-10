@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import type { DrillScene } from "@/lib/drill/scene";
 import type { Map as MapboxMap, Marker, GeoJSONSource } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type * as GeoJSON from "geojson";
@@ -45,6 +46,8 @@ export interface BasinMapProps {
   compact?: boolean;
   /** Sin mensajes de carga/error (fondo decorativo del portal) */
   quiet?: boolean;
+  /** Escena del simulacro en curso: lluvia 3D, frente de crecida por el cauce y llegada a cada punto */
+  scene?: DrillScene | null;
 }
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -71,7 +74,12 @@ function markRasterBlocked() {
   }
 }
 
-function circlePolygon(lng: number, lat: number, radiusM: number, steps = 64): GeoJSON.Feature<GeoJSON.Polygon> {
+function circlePolygon(
+  lng: number,
+  lat: number,
+  radiusM: number,
+  steps = 64,
+): GeoJSON.Feature<GeoJSON.Polygon> {
   const coords: [number, number][] = [];
   const dLat = radiusM / 110574;
   const dLng = radiusM / (111320 * Math.cos((lat * Math.PI) / 180));
@@ -97,6 +105,9 @@ function siteMarkerHtml(s: BasinMapSite, selected: boolean) {
   </div>`;
 }
 
+/** El mapa sigue montado y con estilo (tras map.remove() el estilo queda indefinido). */
+const alive = (map: MapboxMap) => !!(map as unknown as { style?: unknown }).style;
+
 export function BasinMap({
   center,
   sites,
@@ -115,6 +126,7 @@ export function BasinMap({
   flight,
   compact,
   quiet,
+  scene,
 }: BasinMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
@@ -159,12 +171,17 @@ export function BasinMap({
         const msg = ev.error?.message ?? "";
         const status = ev.error?.status;
         const rasterSource = ev.sourceId === "mapbox-satellite" || ev.sourceId === "mapbox-dem";
-        if (rasterSource && (status === 429 || status === 403 || status === 401 || /too many|forbidden/i.test(msg))) {
+        if (
+          rasterSource &&
+          (status === 429 || status === 403 || status === 401 || /too many|forbidden/i.test(msg))
+        ) {
           if (!fallback) {
             fallback = true;
             markRasterBlocked();
             setTopo(true);
-            console.warn("[mapa] Mapbox no entrega teselas raster; se usa vista topográfica + relieve abierto");
+            console.warn(
+              "[mapa] Mapbox no entrega teselas raster; se usa vista topográfica + relieve abierto",
+            );
             if (map.getTerrain()) map.setTerrain(null);
             map.setStyle(STYLE_TOPO);
           }
@@ -188,7 +205,12 @@ export function BasinMap({
                     maxzoom: 14,
                     attribution: "Relieve: Terrain Tiles (AWS Open Data)",
                   }
-                : { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 },
+                : {
+                    type: "raster-dem",
+                    url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+                    tileSize: 512,
+                    maxzoom: 14,
+                  },
             );
           }
           map.setTerrain({ source: "mapbox-dem", exaggeration: 1.45 });
@@ -202,11 +224,40 @@ export function BasinMap({
           });
           const empty = { type: "FeatureCollection" as const, features: [] };
           if (!map.getSource("cauce")) map.addSource("cauce", { type: "geojson", data: empty });
-          if (!map.getLayer("cauce-glow")) map.addLayer({ id: "cauce-glow", type: "line", source: "cauce", paint: { "line-color": "#22d3ee", "line-width": 9, "line-opacity": 0.22, "line-blur": 6 } });
-          if (!map.getLayer("cauce-line")) map.addLayer({ id: "cauce-line", type: "line", source: "cauce", paint: { "line-color": "#67e8f9", "line-width": 2.4, "line-dasharray": [2, 1.5] } });
+          if (!map.getLayer("cauce-glow"))
+            map.addLayer({
+              id: "cauce-glow",
+              type: "line",
+              source: "cauce",
+              paint: { "line-color": "#22d3ee", "line-width": 9, "line-opacity": 0.22, "line-blur": 6 },
+            });
+          if (!map.getLayer("cauce-line"))
+            map.addLayer({
+              id: "cauce-line",
+              type: "line",
+              source: "cauce",
+              paint: { "line-color": "#67e8f9", "line-width": 2.4, "line-dasharray": [2, 1.5] },
+            });
           if (!map.getSource("coverage")) map.addSource("coverage", { type: "geojson", data: empty });
-          if (!map.getLayer("coverage-fill")) map.addLayer({ id: "coverage-fill", type: "fill", source: "coverage", paint: { "fill-color": "#a78bfa", "fill-opacity": 0.07 } });
-          if (!map.getLayer("coverage-line")) map.addLayer({ id: "coverage-line", type: "line", source: "coverage", paint: { "line-color": "#a78bfa", "line-width": 1.2, "line-opacity": 0.6, "line-dasharray": [3, 2] } });
+          if (!map.getLayer("coverage-fill"))
+            map.addLayer({
+              id: "coverage-fill",
+              type: "fill",
+              source: "coverage",
+              paint: { "fill-color": "#a78bfa", "fill-opacity": 0.07 },
+            });
+          if (!map.getLayer("coverage-line"))
+            map.addLayer({
+              id: "coverage-line",
+              type: "line",
+              source: "coverage",
+              paint: {
+                "line-color": "#a78bfa",
+                "line-width": 1.2,
+                "line-opacity": 0.6,
+                "line-dasharray": [3, 2],
+              },
+            });
           if (!map.getSource("sensors")) map.addSource("sensors", { type: "geojson", data: empty });
           if (!map.getLayer("sensors-dot")) {
             map.addLayer({
@@ -221,6 +272,46 @@ export function BasinMap({
               },
             });
           }
+          // Simulacro: frente de crecida (line-gradient requiere lineMetrics) y pulso en la presa
+          if (!map.getSource("flood"))
+            map.addSource("flood", { type: "geojson", data: empty, lineMetrics: true });
+          if (!map.getLayer("flood-glow"))
+            map.addLayer({
+              id: "flood-glow",
+              type: "line",
+              source: "flood",
+              layout: { "line-cap": "round", "line-join": "round" },
+              paint: {
+                "line-width": 22,
+                "line-blur": 14,
+                "line-opacity": 0.55,
+                "line-gradient": "rgba(0,0,0,0)",
+              },
+            });
+          if (!map.getLayer("flood-line"))
+            map.addLayer({
+              id: "flood-line",
+              type: "line",
+              source: "flood",
+              layout: { "line-cap": "round", "line-join": "round" },
+              paint: { "line-width": 6, "line-gradient": "rgba(0,0,0,0)" },
+            });
+          if (!map.getSource("scene-pulse")) map.addSource("scene-pulse", { type: "geojson", data: empty });
+          if (!map.getLayer("scene-pulse"))
+            map.addLayer({
+              id: "scene-pulse",
+              type: "circle",
+              source: "scene-pulse",
+              paint: {
+                "circle-radius": 20,
+                "circle-color": "#ef4444",
+                "circle-opacity": 0,
+                "circle-stroke-color": "#ef4444",
+                "circle-stroke-width": 2,
+                "circle-stroke-opacity": 0,
+                "circle-pitch-alignment": "map",
+              },
+            });
           setReady(true);
           setDataNonce((n) => n + 1);
         } catch (e) {
@@ -267,7 +358,11 @@ export function BasinMap({
       type: "FeatureCollection",
       features: sites
         .filter((s) => s.site.cauce_geojson)
-        .map((s) => ({ type: "Feature", properties: { site: s.site.code }, geometry: s.site.cauce_geojson as unknown as GeoJSON.LineString })),
+        .map((s) => ({
+          type: "Feature",
+          properties: { site: s.site.code },
+          geometry: s.site.cauce_geojson as unknown as GeoJSON.LineString,
+        })),
     });
     (map.getSource("coverage") as GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
@@ -278,7 +373,8 @@ export function BasinMap({
       type: "FeatureCollection",
       features: showSensors
         ? sensors.map((s) => {
-            const stale = !s.last_reading_at || now - new Date(s.last_reading_at).getTime() > s.report_interval_s * 3000;
+            const stale =
+              !s.last_reading_at || now - new Date(s.last_reading_at).getTime() > s.report_interval_s * 3000;
             return {
               type: "Feature",
               properties: { id: s.id, color: stale ? "#a78bfa" : "#22d3ee" },
@@ -299,12 +395,20 @@ export function BasinMap({
       if (cancelled) return;
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
-      const add = (el: HTMLElement, lng: number, lat: number, sel: MapSelection, anchor: "bottom" | "center" = "center") => {
+      const add = (
+        el: HTMLElement,
+        lng: number,
+        lat: number,
+        sel: MapSelection,
+        anchor: "bottom" | "center" = "center",
+      ) => {
         el.addEventListener("click", (e) => {
           e.stopPropagation();
           onSelectRef.current?.(sel);
         });
-        markersRef.current.push(new mapboxgl.Marker({ element: el, anchor }).setLngLat([lng, lat]).addTo(map));
+        markersRef.current.push(
+          new mapboxgl.Marker({ element: el, anchor }).setLngLat([lng, lat]).addTo(map),
+        );
       };
       for (const s of sites) {
         const el = document.createElement("button");
@@ -312,13 +416,17 @@ export function BasinMap({
         el.setAttribute("aria-label", `${s.site.name}: ${LEVELS[s.level].label}`);
         el.innerHTML = siteMarkerHtml(s, selected?.kind === "site" && selected.id === s.site.id);
         add(el, s.site.lng, s.site.lat, { kind: "site", id: s.site.id }, "bottom");
-        const clima = (s.site.metadata as { clima?: { estacion?: string; lat?: number; lng?: number } } | null)?.clima;
+        const clima = (
+          s.site.metadata as { clima?: { estacion?: string; lat?: number; lng?: number } } | null
+        )?.clima;
         if (!compact && clima?.lat && clima?.lng) {
           const st = document.createElement("div");
           st.className = "geriam-station";
           st.title = `Estación meteorológica ${clima.estacion} (red HGPT)`;
           st.innerHTML = `<span class="gs-dot"></span><span class="gs-label">${clima.estacion}</span>`;
-          markersRef.current.push(new mapboxgl.Marker({ element: st, anchor: "left" }).setLngLat([clima.lng, clima.lat]).addTo(map));
+          markersRef.current.push(
+            new mapboxgl.Marker({ element: st, anchor: "left" }).setLngLat([clima.lng, clima.lat]).addTo(map),
+          );
         }
         if (!compact) {
           const dam = document.createElement("div");
@@ -368,22 +476,252 @@ export function BasinMap({
       if (!userPosition) return;
       const el = document.createElement("div");
       el.className = "geriam-user";
-      userMarkerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([userPosition.lng, userPosition.lat]).addTo(map);
+      userMarkerRef.current = new mapboxgl.Marker({ element: el })
+        .setLngLat([userPosition.lng, userPosition.lat])
+        .addTo(map);
     })();
   }, [ready, userPosition]);
+
+  // ─── Simulacro: lluvia, frente de crecida, pulso y llegada a cada punto ───
+  const sceneRef = useRef(scene);
+  useEffect(() => {
+    sceneRef.current = scene;
+  }, [scene]);
+  const etaMarkersRef = useRef<Map<string, { marker: Marker; el: HTMLDivElement }>>(new Map());
+  const sceneSite = scene?.siteId ?? null;
+  const floodOn = scene?.flood !== null && scene?.flood !== undefined;
+
+  // cauce del sitio del simulacro y punto de pulso
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !alive(map) || !map.getSource("flood")) return;
+    const site = sites.find((x) => x.site.id === sceneSite)?.site;
+    const line = site?.cauce_geojson as unknown as GeoJSON.LineString | undefined;
+    (map.getSource("flood") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: line && floodOn ? [{ type: "Feature", properties: {}, geometry: line }] : [],
+    });
+    (map.getSource("scene-pulse") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: site
+        ? [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "Point", coordinates: [site.dam_lng ?? site.lng, site.dam_lat ?? site.lat] },
+            },
+          ]
+        : [],
+    });
+  }, [ready, sceneSite, floodOn, sites]);
+
+  // lluvia 3D y niebla de tormenta
+  const rainBucket = scene ? Math.round(Math.min(scene.rainMmH, 60) / 5) : 0;
+  const levelKey = scene?.level ?? "none";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const m = map as MapboxMap & { setRain?: (r: Record<string, unknown> | null) => void };
+    try {
+      if (rainBucket > 0) {
+        const k = rainBucket / 12;
+        m.setRain?.({
+          density: 0.35 + k * 0.65,
+          intensity: 0.4 + k * 0.6,
+          color: "#9fb0c8",
+          opacity: 0.55 + k * 0.3,
+          vignette: 0.35 + k * 0.4,
+          "vignette-color": "#1e2a3b",
+          direction: [0, 75],
+          "droplet-size": [2.6, 18],
+          "distortion-strength": 0.5,
+          "center-thinning": 0,
+        });
+      } else m.setRain?.(null);
+      const red = levelKey === "roja";
+      map.setFog({
+        range: rainBucket > 0 ? [0.4, 6] : [0.8, 9],
+        color: red
+          ? "rgba(120, 60, 70, 0.6)"
+          : rainBucket > 0
+            ? "rgba(110, 125, 145, 0.7)"
+            : "rgba(186, 210, 235, 0.55)",
+        "high-color": red ? "#3a1620" : rainBucket > 0 ? "#1a2333" : "#24324a",
+        "horizon-blend": rainBucket > 0 ? 0.3 : 0.12,
+        "space-color": "#070d18",
+        "star-intensity": rainBucket > 0 ? 0 : 0.15,
+      });
+    } catch (e) {
+      console.warn("[mapa] efectos del simulacro", e);
+    }
+  }, [ready, rainBucket, levelKey]);
+
+  // animación: frente de crecida y pulso en la presa
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !sceneSite) return;
+    let raf = 0;
+    let last = 0;
+    const COLORS: Record<string, string> = {
+      normal: "#22d3ee",
+      amarilla: "#facc15",
+      naranja: "#fb923c",
+      roja: "#ef4444",
+    };
+    const tick = (ms: number) => {
+      raf = requestAnimationFrame(tick);
+      if (ms - last < 60 || document.hidden) return;
+      last = ms;
+      const sc = sceneRef.current;
+      if (!sc || !alive(map) || !map.getLayer("scene-pulse")) return;
+      const col = COLORS[sc.level] ?? "#22d3ee";
+      const p = (ms / 1600) % 1;
+      map.setPaintProperty("scene-pulse", "circle-radius", 14 + p * 60);
+      map.setPaintProperty("scene-pulse", "circle-stroke-opacity", (1 - p) * 0.9);
+      map.setPaintProperty("scene-pulse", "circle-opacity", (1 - p) * 0.18);
+      map.setPaintProperty("scene-pulse", "circle-color", col);
+      map.setPaintProperty("scene-pulse", "circle-stroke-color", col);
+      if (sc.flood !== null && map.getLayer("flood-line")) {
+        const f = Math.min(0.995, Math.max(0.02, sc.flood));
+        const shimmer = 0.5 + 0.5 * Math.sin(ms / 220);
+        const head = `rgba(255,${Math.round(220 + 35 * shimmer)},${Math.round(200 + 55 * shimmer)},1)`;
+        const body = sc.level === "roja" ? "rgba(239,68,68,0.95)" : "rgba(251,146,60,0.95)";
+        const grad = [
+          "interpolate",
+          ["linear"],
+          ["line-progress"],
+          0,
+          body,
+          Math.max(0.001, f - 0.04),
+          body,
+          f,
+          head,
+          Math.min(0.999, f + 0.004),
+          "rgba(0,0,0,0)",
+          1,
+          "rgba(0,0,0,0)",
+        ];
+        map.setPaintProperty("flood-line", "line-gradient", grad as never);
+        map.setPaintProperty("flood-glow", "line-gradient", grad as never);
+        map.setPaintProperty("flood-glow", "line-opacity", 0.35 + 0.3 * shimmer);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (alive(map) && map.getLayer("scene-pulse")) {
+        map.setPaintProperty("scene-pulse", "circle-opacity", 0);
+        map.setPaintProperty("scene-pulse", "circle-stroke-opacity", 0);
+      }
+    };
+  }, [ready, sceneSite]);
+
+  // marcadores de llegada (cuenta regresiva simulada en cada punto aguas abajo)
+  const etaKey = scene?.etas.map((e) => `${e.name}:${Math.ceil(e.remainingMin)}`).join("|") ?? "";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    let cancelled = false;
+    (async () => {
+      const mapboxgl = (await import("mapbox-gl")).default;
+      if (cancelled) return;
+      const cur = etaMarkersRef.current;
+      const etas = sceneRef.current?.etas ?? [];
+      for (const [name, m] of cur) {
+        if (etas.some((e) => e.name === name)) continue;
+        m.marker.remove();
+        cur.delete(name);
+      }
+      for (const e of etas) {
+        let m = cur.get(e.name);
+        if (!m) {
+          const el = document.createElement("div");
+          el.className = "geriam-eta";
+          m = {
+            el,
+            marker: new mapboxgl.Marker({ element: el, anchor: "bottom" })
+              .setLngLat([e.lng, e.lat])
+              .addTo(map),
+          };
+          cur.set(e.name, m);
+        }
+        const arrived = e.remainingMin <= 0;
+        const h = Math.floor(Math.max(0, e.remainingMin) / 60);
+        const mm = Math.floor(Math.max(0, e.remainingMin) % 60);
+        m.el.dataset.state = arrived ? "llego" : e.remainingMin < 30 ? "pronto" : "espera";
+        m.el.innerHTML = `<span class="ge-name">${e.name}</span><span class="ge-time">${arrived ? "CRECIDA EN EL PUNTO" : `llega en ${h ? `${h} h ` : ""}${mm} min`}</span>`;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, etaKey]);
+  useEffect(
+    () => () => {
+      etaMarkersRef.current.forEach((m) => m.marker.remove());
+      etaMarkersRef.current.clear();
+    },
+    [],
+  );
+
+  // cámara: al iniciar, ir a la presa; cuando sale la crecida, seguir el cauce
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !sceneSite) return;
+    const s = sites.find((x) => x.site.id === sceneSite)?.site;
+    if (s)
+      map.flyTo({
+        center: [s.lng, s.lat],
+        zoom: 13.4,
+        pitch: 62,
+        bearing: map.getBearing(),
+        duration: 2600,
+        essential: true,
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, sceneSite]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !floodOn || !sceneSite) return;
+    const line = sites.find((x) => x.site.id === sceneSite)?.site.cauce_geojson as unknown as
+      GeoJSON.LineString | undefined;
+    if (!line) return;
+    const coords = line.coordinates as [number, number][];
+    const c = coords[Math.floor(coords.length * 0.35)];
+    const prev = coords[Math.max(0, Math.floor(coords.length * 0.35) - 3)];
+    const bearing = (Math.atan2(c[0] - prev[0], c[1] - prev[1]) * 180) / Math.PI;
+    map.flyTo({ center: c, zoom: 11.6, pitch: 60, bearing, duration: 4000, essential: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, floodOn, sceneSite]);
 
   // Vuelos programáticos
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !flight) return;
     if (flight.target === "cuenca") {
-      map.flyTo({ center: [center.lng, center.lat], zoom: center.zoom, pitch: center.pitch, bearing: center.bearing, duration: 2600, essential: true });
+      map.flyTo({
+        center: [center.lng, center.lat],
+        zoom: center.zoom,
+        pitch: center.pitch,
+        bearing: center.bearing,
+        duration: 2600,
+        essential: true,
+      });
     } else if (flight.target === "site") {
       const s = sites.find((x) => x.site.id === flight.siteId);
-      if (s) map.flyTo({ center: [s.site.lng, s.site.lat], zoom: 15.2, pitch: 64, bearing: map.getBearing(), duration: 2200, essential: true });
+      if (s)
+        map.flyTo({
+          center: [s.site.lng, s.site.lat],
+          zoom: 15.2,
+          pitch: 64,
+          bearing: map.getBearing(),
+          duration: 2200,
+          essential: true,
+        });
     } else {
       // seguir el cauce hasta Ambato
-      const line = sites.find((s) => s.site.cauce_geojson)?.site.cauce_geojson as unknown as GeoJSON.LineString | undefined;
+      const line = sites.find((s) => s.site.cauce_geojson)?.site.cauce_geojson as unknown as
+        GeoJSON.LineString | undefined;
       if (!line) return;
       const coords = line.coordinates as [number, number][];
       const keys = [Math.floor(coords.length * 0.25), Math.floor(coords.length * 0.55), coords.length - 1];
@@ -393,7 +731,14 @@ export function BasinMap({
         const c = coords[keys[i]];
         const prev = coords[Math.max(0, keys[i] - 2)];
         const bearing = (Math.atan2(c[0] - prev[0], c[1] - prev[1]) * 180) / Math.PI;
-        map.flyTo({ center: c, zoom: i === keys.length - 1 ? 13.6 : 13, pitch: 66, bearing, duration: 3200, essential: true });
+        map.flyTo({
+          center: c,
+          zoom: i === keys.length - 1 ? 13.6 : 13,
+          pitch: 66,
+          bearing,
+          duration: 3200,
+          essential: true,
+        });
         i++;
         map.once("moveend", next);
       };
@@ -408,23 +753,31 @@ export function BasinMap({
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
       {!ready && !failed && !quiet && (
         <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(ellipse_at_center,#13233a,#070d18)]">
-          <div className="flex flex-col items-center gap-2 text-xs text-fg-faint">
-            <span className="size-6 animate-spin rounded-full border-2 border-accent/30 border-t-accent" aria-hidden />
+          <div className="text-fg-faint flex flex-col items-center gap-2 text-xs">
+            <span
+              className="border-accent/30 border-t-accent size-6 animate-spin rounded-full border-2"
+              aria-hidden
+            />
             Cargando relieve 3D de la cuenca…
           </div>
         </div>
       )}
       {topo && !quiet && !failed && (
-        <div className="pointer-events-none absolute top-3 right-14 hidden rounded bg-bg/80 px-2 py-1 text-[10px] text-fg-muted backdrop-blur sm:block" role="note">
+        <div
+          className="bg-bg/80 text-fg-muted pointer-events-none absolute top-3 right-14 hidden rounded px-2 py-1 text-[10px] backdrop-blur sm:block"
+          role="note"
+        >
           Vista topográfica · imagen satelital no disponible
         </div>
       )}
       {failed && !quiet && (
         <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(ellipse_at_center,#13233a,#070d18)] p-6 text-center">
           <div className="flex max-w-xs flex-col items-center gap-2">
-            <MapPinOff className="size-6 text-fg-faint" aria-hidden />
-            <p className="text-sm font-medium text-fg">Mapa no disponible</p>
-            <p className="text-xs text-fg-muted">{failed}. Los datos en vivo siguen disponibles en los paneles.</p>
+            <MapPinOff className="text-fg-faint size-6" aria-hidden />
+            <p className="text-fg text-sm font-medium">Mapa no disponible</p>
+            <p className="text-fg-muted text-xs">
+              {failed}. Los datos en vivo siguen disponibles en los paneles.
+            </p>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { BellRing, Camera, Home, Map, CirclePlus, UserRound } from "lucide-react
 import { cn } from "@/lib/utils";
 import { Isotipo } from "@/design";
 import { DrillBanner } from "@/components/DrillBanner";
+import { DrillEffects } from "@/components/drill/DrillEffects";
 import { OnlineIndicator } from "./OnlineIndicator";
 import { useOrgLive } from "@/lib/data/live";
 
@@ -24,6 +25,7 @@ export function AppShell({ userName, roleLabel, children }: { userName: string; 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col bg-bg">
       <DrillBanner />
+      <DrillEffects />
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-bg/85 px-4 pt-[max(env(safe-area-inset-top),0.5rem)] pb-2 backdrop-blur-md">
         <Isotipo className="size-7" />
         <div className="min-w-0 flex-1 leading-tight">
