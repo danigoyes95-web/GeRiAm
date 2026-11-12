@@ -70,8 +70,6 @@ export function Overview() {
 
   return (
     <div className="grid gap-3 p-3">
-      {/* Pronóstico del río (INAMHI · GEOGLOWS), en lenguaje sencillo, al inicio */}
-      <RiverForecast reaches={["ambato", "pasa", "CHQ", "MLC"]} showWarnings />
       {/* Fila superior: mapa + alertas */}
       <div className="grid gap-3 xl:h-[clamp(440px,calc(100dvh-28rem),900px)] xl:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="relative h-[60vh] min-h-[380px] overflow-hidden xl:h-auto xl:min-h-0">
@@ -184,6 +182,9 @@ export function Overview() {
           className="flex min-h-[320px] flex-col overflow-hidden xl:min-h-0"
         />
       </div>
+
+      {/* Pronóstico del río (INAMHI · GEOGLOWS) en lenguaje sencillo, justo debajo del mapa */}
+      <RiverForecast reaches={["ambato", "pasa", "CHQ", "MLC"]} showWarnings />
 
       {/* Fila inferior: KPIs por embalse + cámaras */}
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)]">

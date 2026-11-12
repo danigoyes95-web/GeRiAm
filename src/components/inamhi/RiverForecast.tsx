@@ -526,14 +526,14 @@ export function RiverForecast({
                 <span className="text-fg-faint font-normal">· la línea roja es el nivel de crecida</span>
               </div>
               <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                <div className="flex min-w-max gap-1 sm:grid sm:min-w-0 sm:grid-cols-[repeat(15,minmax(0,1fr))]">
+                <div className="flex min-w-max gap-1 sm:grid sm:max-w-2xl sm:min-w-0 sm:grid-cols-[repeat(15,minmax(0,1fr))]">
                   {ds.map((d) => (
                     <div
                       key={d.t}
-                      className="flex w-9 flex-col items-center gap-1 sm:w-auto"
+                      className="flex w-7 flex-col items-center gap-0.5 sm:w-auto"
                       title={`${wdayLong.format(d.t)}: hasta ${formatNumber(d.avg, 0)} m³/s (peor escenario ${formatNumber(d.max, 0)})`}
                     >
-                      <div className="bg-surface-2 relative flex h-14 w-full items-end overflow-hidden rounded-md">
+                      <div className="bg-surface-2 relative flex h-6 w-full items-end overflow-hidden rounded">
                         {plain.rp2 && (
                           <span
                             className="bg-lvl-roja/80 absolute inset-x-0 h-px"
@@ -542,17 +542,17 @@ export function RiverForecast({
                           />
                         )}
                         <div
-                          className={cn("w-full rounded-md", PLAIN[d.level].dot)}
+                          className={cn("w-full rounded", PLAIN[d.level].dot)}
                           style={{
-                            height: `${Math.max(8, Math.min(100, (d.avg / top) * 100))}%`,
+                            height: `${Math.max(18, Math.min(100, (d.avg / top) * 100))}%`,
                             opacity: 0.85,
                           }}
                         />
                       </div>
-                      <span className="text-fg-muted text-[10px] leading-none capitalize">
+                      <span className="text-fg-muted text-[9.5px] leading-none capitalize">
                         {wday.format(d.t).replace(".", "")}
                       </span>
-                      <span className="tabular text-fg text-[11px] leading-none font-semibold">
+                      <span className="tabular text-fg text-[10px] leading-none font-semibold">
                         {dnum.format(d.t)}
                       </span>
                     </div>
