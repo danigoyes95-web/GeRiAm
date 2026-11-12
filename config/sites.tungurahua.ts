@@ -83,7 +83,7 @@ export const ORGANIZATION = {
   name: "Gobierno Provincial de Tungurahua",
   short_name: "GPT",
   timezone: "America/Guayaquil",
-  map_center: { lng: -78.8168, lat: -1.1985, zoom: 13.4, pitch: 62, bearing: -28 },
+  map_center: { lng: -78.792, lat: -1.276, zoom: 11.9, pitch: 60, bearing: -20 },
   branding: {
     product: "GeRiAm",
     tagline: "Gestión de Riesgos Ambato",
@@ -132,7 +132,20 @@ function off(lat: number, lng: number, dLatM: number, dLngM: number): [number, n
   return [lat + dLatM * mLat, lng + dLngM * mLng];
 }
 
-function siteSensors(code: string, lake: [number, number], dam: [number, number], inflow: [number, number], namo: number, cresta: number, qinBase: number): SensorSeed[] {
+/**
+ * Umbrales de piezómetros por defecto (Chiquiurco/Mulacorral). Para presas más altas se pasa `fondo`
+ * y se calculan sobre la presión normal a NAMO (misma fórmula del simulador), con iguales márgenes.
+ */
+function pzThresholds(namo: number, fondo?: number) {
+  if (fondo === undefined) return { pz1: [150, 162, 175], pz2: [215, 228, 242] };
+  const h = namo - fondo;
+  const b1 = 40 + 4.2 * h;
+  const b2 = 95 + 5 * h;
+  return { pz1: [b1 + 18, b1 + 30, b1 + 43].map(Math.round), pz2: [b2 + 10, b2 + 23, b2 + 37].map(Math.round) };
+}
+
+function siteSensors(code: string, lake: [number, number], dam: [number, number], inflow: [number, number], namo: number, cresta: number, qinBase: number, fondo?: number): SensorSeed[] {
+  const pz = pzThresholds(namo, fondo);
   const [dl, dg] = dam;
   const p = (dLat: number, dLng: number) => off(dl, dg, dLat, dLng);
   const s: SensorSeed[] = [
@@ -140,8 +153,8 @@ function siteSensors(code: string, lake: [number, number], dam: [number, number]
     { code: `${code}-PLU-01`, name: "Pluviómetro de balancín", type: "pluviometro", unit: "mm", decimals: 1, lat: lake[0] + 0.0012, lng: lake[1] - 0.0016, position: "Orilla, caseta meteorológica", interval_s: 60, thresholds: { direction: "asc", amarilla: 10, naranja: 20, roja: 35, hysteresis: 2 }, rssi: -104, snr: 3.2, battery: 76 },
     { code: `${code}-QIN-01`, name: "Caudal de entrada — quebrada principal", type: "caudal_entrada", unit: "L/s", decimals: 0, lat: inflow[0], lng: inflow[1], position: "Estación de aforo, cola del embalse", interval_s: 60, thresholds: { direction: "asc", amarilla: qinBase * 1000 * 5, naranja: qinBase * 1000 * 10, roja: qinBase * 1000 * 20, hysteresis: qinBase * 100 }, rssi: -112, snr: -1.5, battery: 64 },
     { code: `${code}-QOUT-01`, name: "Caudal de salida — descarga de fondo + vertedero", type: "caudal_salida", unit: "L/s", decimals: 0, lat: p(-90, -40)[0], lng: p(-90, -40)[1], position: "Canal de descarga al pie de presa", interval_s: 60, rssi: -92, snr: 7.8, battery: 91 },
-    { code: `${code}-PZ-01`, name: "Piezómetro cuerpo de presa", type: "piezometro", unit: "kPa", decimals: 1, lat: p(5, 15)[0], lng: p(5, 15)[1], position: "Cuerpo de presa, eje central", interval_s: 300, thresholds: { direction: "asc", amarilla: 150, naranja: 162, roja: 175, hysteresis: 2 }, rssi: -88, snr: 9.1, battery: 82 },
-    { code: `${code}-PZ-02`, name: "Piezómetro cimentación", type: "piezometro", unit: "kPa", decimals: 1, lat: p(-8, -25)[0], lng: p(-8, -25)[1], position: "Cimentación, estribo izquierdo", interval_s: 300, thresholds: { direction: "asc", amarilla: 215, naranja: 228, roja: 242, hysteresis: 2 }, rssi: -90, snr: 8.4, battery: 79 },
+    { code: `${code}-PZ-01`, name: "Piezómetro cuerpo de presa", type: "piezometro", unit: "kPa", decimals: 1, lat: p(5, 15)[0], lng: p(5, 15)[1], position: "Cuerpo de presa, eje central", interval_s: 300, thresholds: { direction: "asc", amarilla: pz.pz1[0], naranja: pz.pz1[1], roja: pz.pz1[2], hysteresis: 2 }, rssi: -88, snr: 9.1, battery: 82 },
+    { code: `${code}-PZ-02`, name: "Piezómetro cimentación", type: "piezometro", unit: "kPa", decimals: 1, lat: p(-8, -25)[0], lng: p(-8, -25)[1], position: "Cimentación, estribo izquierdo", interval_s: 300, thresholds: { direction: "asc", amarilla: pz.pz2[0], naranja: pz.pz2[1], roja: pz.pz2[2], hysteresis: 2 }, rssi: -90, snr: 8.4, battery: 79 },
     { code: `${code}-AS-01`, name: "Placa de asentamiento — cresta", type: "asentamiento", unit: "mm", decimals: 2, lat: p(0, 40)[0], lng: p(0, 40)[1], position: "Cresta, progresiva 0+080", interval_s: 600, thresholds: { direction: "asc", amarilla: 15, naranja: 18, roja: 22, hysteresis: 0.3 }, rssi: -86, snr: 9.6, battery: 93 },
     { code: `${code}-IN-01`, name: "Inclinómetro talud aguas abajo", type: "inclinometro", unit: "mm", decimals: 2, lat: p(-30, 10)[0], lng: p(-30, 10)[1], position: "Talud aguas abajo, berma 1", interval_s: 600, thresholds: { direction: "asc", amarilla: 5, naranja: 7, roja: 10, hysteresis: 0.2 }, rssi: -91, snr: 7.2, battery: 87 },
     { code: `${code}-RIO-01`, name: "Nivel de río al pie de presa", type: "nivel_rio", unit: "m", decimals: 2, lat: p(-260, -120)[0], lng: p(-260, -120)[1], position: "Cauce, 300 m aguas abajo", interval_s: 60, thresholds: { direction: "asc", amarilla: 1.2, naranja: 1.8, roja: 2.6, hysteresis: 0.05 }, rssi: -108, snr: 0.8, battery: 71 },
@@ -155,6 +168,10 @@ const CHQ_LAKE: [number, number] = [-1.205154, -78.806672];
 const CHQ_DAM: [number, number] = [-1.20855, -78.81032];
 const MLC_LAKE: [number, number] = [-1.190775, -78.826447];
 const MLC_DAM: [number, number] = [-1.19575, -78.82772];
+// Chiquicahua (2026): ubicación estimada con el mapa de la tesis ESPOL (UTM 17S) y validada con el relieve:
+// el vaso aguas arriba de este eje almacena ≈3,07 hm³ a la cota 3.784, como el volumen oficial (3,065 hm³).
+const CQH_LAKE: [number, number] = [-1.35712, -78.76256];
+const CQH_DAM: [number, number] = [-1.35368, -78.76296];
 
 export const SITES: SiteSeed[] = [
   {
@@ -256,10 +273,66 @@ export const SITES: SiteSeed[] = [
     ],
     gateway: { name: "Gateway LoRaWAN Mulacorral", eui: "A84041FFFF1A2B02", lat: off(MLC_DAM[0], MLC_DAM[1], -40, 70)[0], lng: off(MLC_DAM[0], MLC_DAM[1], -40, 70)[1], radius_m: 3000 },
   },
+  {
+    slug: "chiquicahua",
+    code: "CQH",
+    name: "Embalse Chiquicahua",
+    river: "Quebrada Chiquicahua (cuenca alta del río Ambato)",
+    description:
+      "Embalse de riego en la parroquia Pilahuín, inaugurado en 2026. Primera presa con núcleo asfáltico del Ecuador; riega 9.784 ha desde Pilahuín hasta San Juan de Tisaleo.",
+    zone: "Z1",
+    lat: CQH_LAKE[0],
+    lng: CQH_LAKE[1],
+    coord_verificado: false,
+    dam_lat: CQH_DAM[0],
+    dam_lng: CQH_DAM[1],
+    altitude_m: 3790,
+    capacity_m3: 3_065_000,
+    cota_fondo: 3751,
+    cota_namo: 3783.5,
+    cota_vertedero: 3783.5,
+    cota_name: 3786,
+    cota_cresta: 3790,
+    longitud_vertedero: 25,
+    coeficiente_descarga: 1.8,
+    caudal_entrada_base: 0.28,
+    caudal_salida_nominal: 0.26,
+    area_cuenca_km2: 11.7,
+    curva_m: 2.8,
+    metadata: {
+      referencial: true,
+      usos: ["Riego (9.784 ha)", "12.500 familias", "Microcentral prevista"],
+      fuentes: [
+        "Presa de 39 m de altura y 380 m de corona; 3.065.000 m³ (Prefectura de Tungurahua, El Universo)",
+        "Cimentación en la cota 3.751 y vertedero lateral (Primicias)",
+        "Ubicación estimada con la tesis ESPOL (Torres) y el relieve; cotas NAMO/NAME referenciales",
+        "Climatología de referencia: estación HGPT-MT-10 Mulacorral (la más cercana con serie horaria)",
+      ],
+      altura_presa_m: 39,
+      longitud_corona_m: 380,
+      tipo_presa: "Materiales sueltos con núcleo asfáltico (primera en Ecuador)",
+      instrumentacion: "Sistema SCADA con estaciones meteorológicas e hidrológicas (Prefectura)",
+      clima: CLIMATOLOGIA.MLC,
+    },
+    cauce: CAUCES.CQH as [number, number][],
+    downstream: [
+      { point: "pasa", distancia_km: 11.7, llegada_min: 25, transito_min: 55, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+      { point: "quisapincha", distancia_km: 19.1, llegada_min: 70, transito_min: 130, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+      { point: "ambato", distancia_km: 30.3, llegada_min: 125, transito_min: 255, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+    ],
+    sensors: [],
+    cameras: [
+      { code: "CQH-CAM-01", name: "Cortina — vista general", kind: "PTZ", lat: off(CQH_DAM[0], CQH_DAM[1], 120, -60)[0], lng: off(CQH_DAM[0], CQH_DAM[1], 120, -60)[1], position: "Ladera izquierda, aguas abajo", clip: "/demo/cams/cam7.mp4", bearing: 200 },
+      { code: "CQH-CAM-02", name: "Vertedero lateral", kind: "fija", lat: off(CQH_DAM[0], CQH_DAM[1], 10, 140)[0], lng: off(CQH_DAM[0], CQH_DAM[1], 10, 140)[1], position: "Estribo derecho", clip: "/demo/cams/cam8.mp4", bearing: 250 },
+      { code: "CQH-CAM-03", name: "Espejo de agua", kind: "PTZ", lat: off(CQH_DAM[0], CQH_DAM[1], -60, 20)[0], lng: off(CQH_DAM[0], CQH_DAM[1], -60, 20)[1], position: "Torre de toma", clip: "/demo/cams/cam9.mp4", bearing: 180 },
+    ],
+    gateway: { name: "Gateway LoRaWAN Chiquicahua", eui: "A84041FFFF1A2B03", lat: off(CQH_DAM[0], CQH_DAM[1], 60, -110)[0], lng: off(CQH_DAM[0], CQH_DAM[1], 60, -110)[1], radius_m: 3000 },
+  },
 ];
 
 SITES[0].sensors = siteSensors("CHQ", CHQ_LAKE, CHQ_DAM, [-1.2001, -78.8001], SITES[0].cota_namo, SITES[0].cota_cresta, SITES[0].caudal_entrada_base);
 SITES[1].sensors = siteSensors("MLC", MLC_LAKE, MLC_DAM, [-1.1846, -78.8228], SITES[1].cota_namo, SITES[1].cota_cresta, SITES[1].caudal_entrada_base);
+SITES[2].sensors = siteSensors("CQH", CQH_LAKE, CQH_DAM, [-1.3605, -78.7618], SITES[2].cota_namo, SITES[2].cota_cresta, SITES[2].caudal_entrada_base, SITES[2].cota_fondo);
 // Estaciones hidrométricas en puntos de control (vinculadas a Chiquiurco, enlace celular/API)
 for (const dp of DOWNSTREAM_POINTS) {
   SITES[0].sensors.push({

@@ -38,6 +38,8 @@ const sb = createClient<DB, GeriamSchema>(url, key, { db: { schema }, auth: { pe
 const args = Object.fromEntries(process.argv.slice(2).map((a) => a.replace(/^--/, "").split("=")));
 const only = args.only ? new Set(String(args.only).split(",")) : null;
 const run = (step: string) => !only || only.has(step);
+/** --site=CQH: sembrar o rellenar solo ese embalse, sin tocar los demás (umbrales editados, etc.). */
+const siteFilter = args.site ? String(args.site) : null;
 
 function ok<T>(r: { data: T; error: { message: string } | null }, what: string): NonNullable<T> {
   if (r.error) throw new Error(`${what}: ${r.error.message}`);
@@ -70,7 +72,7 @@ async function seed() {
     points[d.key] = r.id;
   }
 
-  for (const s of SITES) {
+  for (const s of SITES.filter((x) => !siteFilter || x.code === siteFilter)) {
     const site = ok(
       await sb
         .from("sites")
@@ -163,7 +165,7 @@ async function seed() {
               code: se.code,
               name: se.name,
               type: se.type,
-              dev_eui: se.downstreamPoint ? null : `70B3D57ED00${s.code === "CHQ" ? "1" : "2"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`,
+              dev_eui: se.downstreamPoint ? null : `70B3D57ED00${{ CHQ: "1", MLC: "2", CQH: "3" }[s.code as "CHQ" | "MLC" | "CQH"] ?? "9"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`,
               unit: se.unit,
               decimals: se.decimals,
               lat: se.lat,
@@ -266,25 +268,27 @@ async function secrets(orgId: string) {
 }
 
 async function backfill(orgId: string, days: number) {
-  const count = await sb.from("readings").select("sensor_id", { count: "exact", head: true }).eq("organization_id", orgId);
+  const b = await loadOrgBundle(sb, orgId);
+  const targets = b.sites.filter((s) => !siteFilter || s.code === siteFilter);
+  const targetSensors = b.sensors.filter((x) => targets.some((s) => s.id === x.site_id)).map((x) => x.id);
+  const count = await sb.from("readings").select("sensor_id", { count: "exact", head: true }).eq("organization_id", orgId).in("sensor_id", targetSensors);
   if ((count.count ?? 0) > 0 && !args.force) {
     console.log(`• backfill omitido: ya hay ${count.count} lecturas (use --force)`);
     return;
   }
-  const b = await loadOrgBundle(sb, orgId);
   const end = Date.now();
   const start = Math.floor((end - days * 86400_000) / 900_000) * 900_000;
-  const offsets: Record<string, number> = { CHQ: -0.5, MLC: -1.6 };
+  const offsets: Record<string, number> = { CHQ: -0.5, MLC: -1.6, CQH: -1.2 };
   const states: Record<string, SiteState> = {};
-  for (const s of b.sites) {
+  for (const s of targets) {
     const p = paramsFor(s);
     states[s.code] = initialState(p, p.namo + (offsets[s.code] ?? -0.8), start, hashSeed(`${s.code}-backfill`));
   }
   let total = 0;
   let buffer: ReturnType<typeof readingRows> = [];
   for (let t = start + 900_000; t <= end; t += 900_000) {
-    for (const s of b.sites) states[s.code] = stepSite(paramsFor(s), states[s.code], 900);
-    for (const s of b.sites) {
+    for (const s of targets) states[s.code] = stepSite(paramsFor(s), states[s.code], 900);
+    for (const s of targets) {
       const st = { ...states[s.code], lastEmit: { ...states[s.code].lastEmit }, battery: { ...states[s.code].battery } };
       const readings = emitReadings(st, simSensorsFor(b, s), states, { mode: "backfill", stepS: 900 });
       states[s.code] = st;

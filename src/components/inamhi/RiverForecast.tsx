@@ -418,6 +418,7 @@ function PlainWarnings({ w }: { w: InamhiPayload["warnings"] }) {
 const PLACE: Record<ReachKey, string> = {
   CHQ: "Salida de Chiquiurco",
   MLC: "Salida de Mulacorral",
+  CQH: "Salida de Chiquicahua",
   pasa: "En Pasa",
   quisapincha: "En Quisapincha",
   ambato: "En Ambato",
