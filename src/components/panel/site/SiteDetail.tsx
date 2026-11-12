@@ -304,7 +304,7 @@ export function SiteDetail({ slug }: { slug: string }) {
         {/* Columna principal */}
         <div className="min-w-0 space-y-3">
           <RiverForecast
-            reaches={[site.code === "MLC" ? "MLC" : "CHQ", "pasa", "ambato"]}
+            reaches={[(["CHQ", "MLC", "CQH"].includes(site.code) ? site.code : "CHQ") as "CHQ" | "MLC" | "CQH", "pasa", "ambato"]}
             showWarnings
             height={230}
           />

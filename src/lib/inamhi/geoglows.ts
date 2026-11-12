@@ -10,6 +10,7 @@ export const GEOGLOWS_API = "https://services.geoglows.org/api";
 export const REACHES = {
   CHQ: { comid: 620633306, name: "Salida de Chiquiurco" },
   MLC: { comid: 620583771, name: "Salida de Mulacorral" },
+  CQH: { comid: 620722751, name: "Salida de Chiquicahua" },
   pasa: { comid: 620886494, name: "Río Ambato a la altura de Pasa" },
   quisapincha: { comid: 620915389, name: "Río Ambato a la altura de Quisapincha" },
   ambato: { comid: 620927772, name: "Río Ambato en Ambato" },
@@ -20,6 +21,7 @@ export type ReachKey = keyof typeof REACHES;
 const WATCH_POINTS: { name: string; lng: number; lat: number }[] = [
   { name: "Chiquiurco", lng: -78.81032, lat: -1.20855 },
   { name: "Mulacorral", lng: -78.82772, lat: -1.19575 },
+  { name: "Chiquicahua", lng: -78.76296, lat: -1.35368 },
   { name: "Pasa", lng: -78.7262, lat: -1.2685 },
   { name: "Ambato", lng: -78.6168, lat: -1.2491 },
 ];

@@ -49,7 +49,7 @@ export function Overview() {
   const mosaic = useMemo(() => {
     if (!data) return [];
     const bySite = data.sites.map((s) => data.cameras.filter((c) => c.site_id === s.id).slice(0, 2));
-    return bySite.flat().slice(0, 4);
+    return bySite.flat().slice(0, 6);
   }, [data]);
 
   if (isError) {
@@ -184,16 +184,16 @@ export function Overview() {
       </div>
 
       {/* Pronóstico del río (INAMHI · GEOGLOWS) en lenguaje sencillo, justo debajo del mapa */}
-      <RiverForecast reaches={["ambato", "pasa", "CHQ", "MLC"]} showWarnings />
+      <RiverForecast reaches={["ambato", "pasa", "CHQ", "MLC", "CQH"]} showWarnings />
 
       {/* Fila inferior: KPIs por embalse + cámaras */}
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)]">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {data
           ? summaries.map((s) => (
               <SiteKpiPanel key={s.site.id} summary={s} series={series.data} rain={rain.data?.[s.site.id]} />
             ))
-          : Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-[300px]" />)}
-        <Card className="overflow-hidden">
+          : Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[300px]" />)}
+        <Card className="overflow-hidden md:col-span-2 xl:col-span-3">
           <CardHeader title="Cámaras en vivo" subtitle="Cortinas y vertederos" icon={<Video />} />
           <div className="p-2">
             {data ? (
@@ -203,6 +203,7 @@ export function Overview() {
                 entity={panel.branding.entity ?? panel.orgName}
                 linkOnline={(id) => summaries.find((s) => s.site.id === id)?.linkOnline ?? true}
                 compact
+                className="sm:grid-cols-3 xl:grid-cols-6"
               />
             ) : (
               <Skeleton className="aspect-video w-full" />
