@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { Layers, Mountain, Navigation, RadioTower, Video } from "lucide-react";
 import { BasinMap, type MapSelection } from "@/components/map/BasinMap";
-import { DrillHud, useDrillScene } from "@/components/drill/DrillEffects";
+import { DrillChip, DrillHud, useDrillScene } from "@/components/drill/DrillEffects";
 import { RiverForecast } from "@/components/inamhi/RiverForecast";
 import { usePanel } from "@/components/panel/PanelContext";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -70,6 +70,8 @@ export function Overview() {
 
   return (
     <div className="grid gap-3 p-3">
+      {/* Pronóstico del río (INAMHI · GEOGLOWS), en lenguaje sencillo, al inicio */}
+      <RiverForecast reaches={["ambato", "pasa", "CHQ", "MLC"]} showWarnings />
       {/* Fila superior: mapa + alertas */}
       <div className="grid gap-3 xl:h-[clamp(440px,calc(100dvh-28rem),900px)] xl:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="relative h-[60vh] min-h-[380px] overflow-hidden xl:h-auto xl:min-h-0">
@@ -102,7 +104,11 @@ export function Overview() {
           )}
           {/* controles (durante un simulacro, el tablero del simulacro ocupa su lugar) */}
           {scene ? (
-            <DrillHud scene={scene} className="absolute top-3 left-3" />
+            <>
+              {/* en celular el tablero completo va debajo del mapa; sobre el mapa, solo una franja */}
+              <DrillHud scene={scene} className="absolute top-3 left-3 hidden sm:block" />
+              <DrillChip scene={scene} className="absolute top-2 right-14 left-2 sm:hidden" />
+            </>
           ) : (
             <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
               <Button
@@ -171,6 +177,7 @@ export function Overview() {
             </div>
           </div>
         </Card>
+        {scene && <DrillHud scene={scene} className="w-full sm:hidden" />}
         <AlertsColumn
           data={data}
           role={panel.role}
@@ -202,8 +209,6 @@ export function Overview() {
           </div>
         </Card>
       </div>
-      {/* Pronóstico hidrológico del INAMHI (GEOGLOWS) para el río Ambato */}
-      <RiverForecast reaches={["ambato", "pasa", "CHQ", "MLC"]} showWarnings />
     </div>
   );
 }
