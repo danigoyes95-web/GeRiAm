@@ -303,6 +303,11 @@ export function SiteDetail({ slug }: { slug: string }) {
 
         {/* Columna principal */}
         <div className="min-w-0 space-y-3">
+          <RiverForecast
+            reaches={[site.code === "MLC" ? "MLC" : "CHQ", "pasa", "ambato"]}
+            showWarnings
+            height={230}
+          />
           <Card>
             <CardHeader
               title="Nivel del embalse"
@@ -334,11 +339,6 @@ export function SiteDetail({ slug }: { slug: string }) {
               )}
             </CardBody>
           </Card>
-          <RiverForecast
-            reaches={[site.code === "MLC" ? "MLC" : "CHQ", "pasa", "ambato"]}
-            showWarnings
-            height={230}
-          />
           <div className="grid gap-3 2xl:grid-cols-2">
             <Card>
               <CardHeader title="Caudales y lluvia" subtitle="L/s · mm por intervalo" icon={<Activity />} />

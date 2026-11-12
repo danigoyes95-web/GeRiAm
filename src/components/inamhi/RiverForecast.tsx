@@ -5,7 +5,7 @@ import * as echarts from "echarts/core";
 import { LineChart } from "echarts/charts";
 import { GridComponent, TooltipComponent, MarkLineComponent, LegendComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
-import { CloudLightning, TrendingUp, Waves } from "lucide-react";
+import { CloudLightning, Waves } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { SegmentedControl, Skeleton } from "@/components/ui/misc";
 import { formatDateTime, formatNumber } from "@/lib/format";
@@ -17,13 +17,6 @@ import { useInamhi, type InamhiPayload } from "./useInamhi";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, LegendComponent, CanvasRenderer]);
 
-const REACH_LABEL: Record<ReachKey, string> = {
-  CHQ: "Salida Chiquiurco",
-  MLC: "Salida Mulacorral",
-  pasa: "Pasa",
-  quisapincha: "Quisapincha",
-  ambato: "Ambato",
-};
 const RP_COLOR: Record<number, string> = { 2: "#facc15", 10: "#fb923c", 50: "#ef4444" };
 const MONO = "JetBrains Mono, ui-monospace, monospace";
 const TZ = "America/Guayaquil";
@@ -291,7 +284,146 @@ function WarningsStrip({ w }: { w: InamhiPayload["warnings"] }) {
   );
 }
 
-/** Pronóstico de caudal GEOGLOWS (INAMHI) a 15 días con umbrales de crecida y avisos meteorológicos. */
+type Plain = "tranquilo" | "atencion" | "crecida";
+
+const PLAIN: Record<Plain, { cls: string; dot: string; label: string }> = {
+  tranquilo: {
+    cls: "border-lvl-normal/40 bg-[var(--lvl-normal-bg)] text-lvl-normal",
+    dot: "bg-lvl-normal",
+    label: "Normal",
+  },
+  atencion: {
+    cls: "border-lvl-amarilla/40 bg-[var(--lvl-amarilla-bg)] text-lvl-amarilla",
+    dot: "bg-lvl-amarilla",
+    label: "Atención",
+  },
+  crecida: {
+    cls: "border-lvl-roja/40 bg-[var(--lvl-roja-bg)] text-lvl-roja",
+    dot: "bg-lvl-roja",
+    label: "Crecida",
+  },
+};
+
+const dayKey = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const wday = new Intl.DateTimeFormat("es-EC", { weekday: "short", timeZone: TZ });
+const dnum = new Intl.DateTimeFormat("es-EC", { day: "numeric", timeZone: TZ });
+const wdayLong = new Intl.DateTimeFormat("es-EC", { weekday: "long", day: "numeric", timeZone: TZ });
+
+/** Resumen en lenguaje sencillo: nivel general, día del pico y comparación con una crecida. */
+function plainSummary(f: Forecast) {
+  const rp2 = f.returnPeriods?.[2] ?? null;
+  const peak = f.peak?.avg ?? 0;
+  const ext = f.extreme?.max ?? 0;
+  const level: Plain =
+    rp2 && peak >= rp2 ? "crecida" : rp2 && (ext >= rp2 || peak >= rp2 * 0.6) ? "atencion" : "tranquilo";
+  const ratio = rp2 ? peak / rp2 : 0;
+  const share =
+    ratio < 0.25
+      ? "menos de la cuarta parte"
+      : ratio < 0.5
+        ? "menos de la mitad"
+        : ratio < 0.8
+          ? "bastante menos"
+          : ratio < 1
+            ? "casi lo mismo"
+            : "más";
+  const peakDay = f.peak ? wdayLong.format(f.peak.t) : "";
+  const extDay = f.extreme ? wdayLong.format(f.extreme.t) : "";
+  const title =
+    level === "crecida"
+      ? "Se espera que el río crezca"
+      : level === "atencion"
+        ? "Río normal, con una posibilidad baja de crecida"
+        : "Río tranquilo los próximos 15 días";
+  const text =
+    level === "crecida"
+      ? `El pronóstico más probable supera el nivel de crecida el ${peakDay}. Prepare la respuesta.`
+      : level === "atencion" && rp2 && ext >= rp2
+        ? `Lo más probable es que el río siga normal. Solo en el peor de 51 escenarios llegaría a nivel de crecida (${extDay}).`
+        : `Lo más alto que llegaría es ${formatNumber(peak, 0)} m³/s el ${peakDay}: ${share} de lo que se considera una crecida${rp2 ? ` (${formatNumber(rp2, 0)} m³/s)` : ""}.`;
+  return { level, title, text, rp2, peak, ext };
+}
+
+/** Un día por columna: altura = lo más probable; punto = el peor escenario. */
+function days(f: Forecast) {
+  const rp2 = f.returnPeriods?.[2] ?? null;
+  const map = new Map<string, { t: number; avg: number; max: number }>();
+  for (const p of f.series) {
+    if (p.avg === null || p.max === null) continue;
+    const k = dayKey.format(p.t);
+    const d = map.get(k) ?? { t: p.t, avg: 0, max: 0 };
+    d.avg = Math.max(d.avg, p.avg);
+    d.max = Math.max(d.max, p.max);
+    map.set(k, d);
+  }
+  return [...map.values()].slice(0, 15).map((d) => ({
+    ...d,
+    level: (rp2 && d.avg >= rp2
+      ? "crecida"
+      : rp2 && (d.max >= rp2 || d.avg >= rp2 * 0.6)
+        ? "atencion"
+        : "tranquilo") as Plain,
+  }));
+}
+
+function PlainWarnings({ w }: { w: InamhiPayload["warnings"] }) {
+  if (!w) return null;
+  const relevant = w.warnings.filter((x) => x.affects.length > 0);
+  if (relevant.length) {
+    return (
+      <div className="space-y-1.5">
+        {relevant.map((x) => (
+          <div
+            key={x.no + x.start}
+            className={cn(
+              "flex items-start gap-2 rounded-lg border px-3 py-2 text-[13px]",
+              x.level === "Muy Alto" || x.level === "Crecida" ? PLAIN.crecida.cls : PLAIN.atencion.cls,
+            )}
+          >
+            <CloudLightning className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              <b>El INAMHI avisa: {x.type.toLowerCase()}</b>
+              {x.level ? ` (nivel ${x.level})` : ""} {x.active ? "hasta el" : "desde el"}{" "}
+              {wdayLong.format(Date.parse((x.active ? x.end : x.start) + "-05:00"))}. Afecta a{" "}
+              {x.affects.join(", ")}.
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="border-border bg-surface-2 text-fg-muted flex items-start gap-2 rounded-lg border px-3 py-2 text-[13px]">
+      <CloudLightning className="text-fg-faint mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>
+        <b className="text-fg">El INAMHI no tiene avisos de lluvia</b> para las presas ni para Ambato.
+        {w.last && (
+          <span className="text-fg-faint">
+            {" "}
+            Último aviso: N° {w.last.no}, del{" "}
+            {formatDateTime(Date.parse(w.last.start + "-05:00")).slice(0, 5)} al{" "}
+            {formatDateTime(Date.parse(w.last.end + "-05:00")).slice(0, 5)}.
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+const PLACE: Record<ReachKey, string> = {
+  CHQ: "Salida de Chiquiurco",
+  MLC: "Salida de Mulacorral",
+  pasa: "En Pasa",
+  quisapincha: "En Quisapincha",
+  ambato: "En Ambato",
+};
+
+/** Pronóstico del río en lenguaje sencillo (INAMHI · GEOGLOWS), con el detalle técnico a un toque. */
 export function RiverForecast({
   reaches,
   initial,
@@ -306,114 +438,237 @@ export function RiverForecast({
   className?: string;
 }) {
   const [reach, setReach] = useState<ReachKey>(initial ?? reaches[0]);
+  const [tech, setTech] = useState(false);
   const q = useInamhi(reach);
   const f = q.data?.forecast ?? null;
   const st = f ? status(f) : null;
+  const plain = f ? plainSummary(f) : null;
+  const ds = f ? days(f) : [];
+  const top = plain ? Math.max(plain.rp2 ?? 0, plain.ext, ...ds.map((d) => d.max)) * 1.05 || 1 : 1;
   return (
     <Card className={cn("min-w-0", className)}>
       <CardHeader
-        title="Pronóstico de caudal · próximos 15 días"
+        title="¿Qué va a pasar con el río?"
         subtitle={
           f
-            ? `${f.name} · INAMHI · GEOGLOWS (ECMWF) · emitido ${formatDateTime(f.issued + "T00:00:00Z").slice(0, 10)}`
-            : "INAMHI · GEOGLOWS (ECMWF)"
+            ? `Pronóstico del INAMHI para los próximos 15 días · actualizado el ${formatDateTime(f.issued + "T12:00:00Z").slice(0, 5)}`
+            : "Pronóstico del INAMHI para los próximos 15 días"
         }
-        icon={<TrendingUp />}
+        icon={<Waves />}
       />
       <div className="space-y-3 p-3 sm:p-4">
         {reaches.length > 1 && (
           <div className="-mx-1 max-w-full overflow-x-auto px-1">
             <SegmentedControl<ReachKey>
-              label="Tramo del río"
+              label="Lugar del río"
               value={reach}
               onChange={setReach}
-              options={reaches.map((r) => ({ value: r, label: REACH_LABEL[r] }))}
+              options={reaches.map((r) => ({ value: r, label: PLACE[r] }))}
             />
           </div>
         )}
         {q.isLoading ? (
-          <Skeleton className="w-full" style={{ height: height + 70 }} />
-        ) : !f ? (
-          <div
-            className="border-border text-fg-faint grid place-items-center rounded-md border border-dashed p-8 text-center text-xs"
-            style={{ height }}
-          >
-            Pronóstico del INAMHI no disponible en este momento. Se reintenta automáticamente.
+          <Skeleton className="h-48 w-full" />
+        ) : !f || !plain ? (
+          <div className="border-border text-fg-faint grid h-32 place-items-center rounded-md border border-dashed p-6 text-center text-xs">
+            El pronóstico del INAMHI no está disponible en este momento. Se reintenta automáticamente.
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-stretch gap-2">
-              {st && (
-                <div
-                  className={cn(
-                    "flex min-w-[220px] flex-1 items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold",
-                    TONE[st.tone],
+            {/* 1. La respuesta en una frase */}
+            <div className={cn("rounded-xl border p-3 sm:p-4", PLAIN[plain.level].cls)}>
+              <div className="flex items-center gap-2 text-[15px] font-bold sm:text-base">
+                <span className={cn("size-2.5 shrink-0 rounded-full", PLAIN[plain.level].dot)} aria-hidden />
+                {plain.title}
+              </div>
+              <p className="text-fg mt-1 text-[13.5px] leading-snug">{plain.text}</p>
+            </div>
+
+            {/* 2. Barra: lo más alto esperado vs. nivel de crecida */}
+            {plain.rp2 && (
+              <div>
+                <div className="text-fg-muted mb-1.5 flex flex-wrap justify-between gap-x-3 text-[12px]">
+                  <span>
+                    Lo más alto que llegaría: <b className="text-fg">{formatNumber(plain.peak, 0)} m³/s</b>
+                  </span>
+                  <span>
+                    Crecida: <b className="text-lvl-roja">{formatNumber(plain.rp2, 0)} m³/s</b>
+                  </span>
+                </div>
+                <div className="bg-surface-3 relative h-3 rounded-full">
+                  <div
+                    className={cn("absolute inset-y-0 left-0 rounded-full", PLAIN[plain.level].dot)}
+                    style={{ width: `${Math.min(100, (plain.peak / top) * 100)}%` }}
+                  />
+                  <span
+                    className="bg-lvl-roja absolute -top-1 h-5 w-0.5 -translate-x-1/2 rounded"
+                    style={{ left: `${Math.min(100, (plain.rp2 / top) * 100)}%` }}
+                    title="Nivel de crecida"
+                  />
+                  {plain.ext > plain.peak && (
+                    <span
+                      className="border-fg-muted absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-transparent"
+                      style={{ left: `${Math.min(100, (plain.ext / top) * 100)}%` }}
+                      title="Peor escenario"
+                    />
                   )}
-                >
-                  <Waves className="size-4 shrink-0" aria-hidden />
-                  {st.text}
                 </div>
-              )}
-              {[
-                [
-                  "Pico esperado",
-                  f.peak ? `${formatNumber(f.peak.avg, 1)} m³/s` : "—",
-                  f.peak ? dayHour.format(f.peak.t) : "",
-                ],
-                [
-                  "Escenario extremo",
-                  f.extreme ? `${formatNumber(f.extreme.max, 1)} m³/s` : "—",
-                  f.extreme ? dayHour.format(f.extreme.t) : "",
-                ],
-                [
-                  "Crecida de 2 años",
-                  f.returnPeriods ? `${formatNumber(f.returnPeriods[2], 0)} m³/s` : "—",
-                  f.years ? `${f.years} años de registro` : "",
-                ],
-              ].map(([k, v, sub]) => (
-                <div
-                  key={k}
-                  className="border-border bg-surface-2 min-w-[120px] flex-1 rounded-md border px-3 py-1.5"
-                >
-                  <div className="text-fg-faint text-[10.5px] font-medium tracking-wide uppercase">{k}</div>
-                  <div className="tabular font-mono text-[15px] font-semibold whitespace-nowrap">{v}</div>
-                  <div className="text-fg-faint text-[10.5px]">{sub}</div>
+                <div className="text-fg-faint mt-1 text-[11px]">
+                  ○ = el peor de los 51 escenarios ({formatNumber(plain.ext, 0)} m³/s)
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* 3. Los 15 días */}
+            <div>
+              <div className="text-fg-muted mb-1.5 text-[12px] font-medium">
+                Día por día{" "}
+                <span className="text-fg-faint font-normal">· la línea roja es el nivel de crecida</span>
+              </div>
+              <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                <div className="flex min-w-max gap-1 sm:grid sm:min-w-0 sm:grid-cols-[repeat(15,minmax(0,1fr))]">
+                  {ds.map((d) => (
+                    <div
+                      key={d.t}
+                      className="flex w-9 flex-col items-center gap-1 sm:w-auto"
+                      title={`${wdayLong.format(d.t)}: hasta ${formatNumber(d.avg, 0)} m³/s (peor escenario ${formatNumber(d.max, 0)})`}
+                    >
+                      <div className="bg-surface-2 relative flex h-14 w-full items-end overflow-hidden rounded-md">
+                        {plain.rp2 && (
+                          <span
+                            className="bg-lvl-roja/80 absolute inset-x-0 h-px"
+                            style={{ bottom: `${Math.min(100, (plain.rp2 / top) * 100)}%` }}
+                            aria-hidden
+                          />
+                        )}
+                        <div
+                          className={cn("w-full rounded-md", PLAIN[d.level].dot)}
+                          style={{
+                            height: `${Math.max(8, Math.min(100, (d.avg / top) * 100))}%`,
+                            opacity: 0.85,
+                          }}
+                        />
+                      </div>
+                      <span className="text-fg-muted text-[10px] leading-none capitalize">
+                        {wday.format(d.t).replace(".", "")}
+                      </span>
+                      <span className="tabular text-fg text-[11px] leading-none font-semibold">
+                        {dnum.format(d.t)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="text-fg-muted mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                {(["tranquilo", "atencion", "crecida"] as Plain[]).map((l) => (
+                  <span key={l} className="inline-flex items-center gap-1">
+                    <span className={cn("size-2 rounded-full", PLAIN[l].dot)} />
+                    {l === "tranquilo"
+                      ? "Normal"
+                      : l === "atencion"
+                        ? "Atención (podría subir)"
+                        : "Crecida probable"}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div
-              className="text-fg-muted flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]"
-              aria-hidden
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-[3px] w-4 rounded bg-[#22d3ee]" />
-                Promedio (51 escenarios)
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-4 border-t-2 border-dashed border-[#e879f9]" />
-                Alta resolución
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-4 rounded-sm bg-sky-400/45" />
-                25–75 %
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-4 rounded-sm bg-sky-400/15" />
-                Rango total
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="bg-fg-faint h-3 w-px" />
-                Ahora
-              </span>
-            </div>
-            <ForecastChart f={f} height={height} />
           </>
         )}
-        {showWarnings && <WarningsStrip w={q.data?.warnings ?? null} />}
-        <p className="text-fg-faint text-[10.5px]">
-          Modelo hidrológico global GEOGLOWS (ECMWF) publicado por el INAMHI: 51 escenarios y una corrida de
-          alta resolución. Los umbrales de crecida se calculan con la serie simulada desde 1980 (Gumbel). Es
-          orientativo y complementa, no reemplaza, la medición en sitio.
+
+        {showWarnings && <PlainWarnings w={q.data?.warnings ?? null} />}
+
+        {f && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setTech((v) => !v)}
+              aria-expanded={tech}
+              className="text-accent hover:bg-accent-soft rounded-md px-2 py-1 text-[12px] font-medium"
+            >
+              {tech ? "Ocultar gráfico técnico" : "Ver gráfico técnico"}
+            </button>
+            {tech && (
+              <div className="mt-2 space-y-3">
+                <div className="flex flex-wrap items-stretch gap-2">
+                  {st && (
+                    <div
+                      className={cn(
+                        "flex min-w-[220px] flex-1 items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold",
+                        TONE[st.tone],
+                      )}
+                    >
+                      <Waves className="size-4 shrink-0" aria-hidden />
+                      {st.text}
+                    </div>
+                  )}
+                  {[
+                    [
+                      "Pico esperado",
+                      f.peak ? `${formatNumber(f.peak.avg, 1)} m³/s` : "—",
+                      f.peak ? dayHour.format(f.peak.t) : "",
+                    ],
+                    [
+                      "Escenario extremo",
+                      f.extreme ? `${formatNumber(f.extreme.max, 1)} m³/s` : "—",
+                      f.extreme ? dayHour.format(f.extreme.t) : "",
+                    ],
+                    [
+                      "Crecida de 2 años",
+                      f.returnPeriods ? `${formatNumber(f.returnPeriods[2], 0)} m³/s` : "—",
+                      f.years ? `${f.years} años de registro` : "",
+                    ],
+                  ].map(([k, v, sub]) => (
+                    <div
+                      key={k}
+                      className="border-border bg-surface-2 min-w-[120px] flex-1 rounded-md border px-3 py-1.5"
+                    >
+                      <div className="text-fg-faint text-[10.5px] font-medium tracking-wide uppercase">
+                        {k}
+                      </div>
+                      <div className="tabular font-mono text-[15px] font-semibold whitespace-nowrap">{v}</div>
+                      <div className="text-fg-faint text-[10.5px]">{sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div
+                  className="text-fg-muted flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]"
+                  aria-hidden
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-[3px] w-4 rounded bg-[#22d3ee]" />
+                    Promedio (51 escenarios)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-4 border-t-2 border-dashed border-[#e879f9]" />
+                    Alta resolución
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-4 rounded-sm bg-sky-400/45" />
+                    25–75 %
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-4 rounded-sm bg-sky-400/15" />
+                    Rango total
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="bg-fg-faint h-3 w-px" />
+                    Ahora
+                  </span>
+                </div>
+                <ForecastChart f={f} height={height} />
+                {showWarnings && <WarningsStrip w={q.data?.warnings ?? null} />}
+                <p className="text-fg-faint text-[10.5px]">
+                  Modelo hidrológico global GEOGLOWS (ECMWF) publicado por el INAMHI: 51 escenarios y una
+                  corrida de alta resolución. Umbrales de crecida por periodo de retorno (Gumbel) con la serie
+                  simulada desde 1980.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        <p className="text-fg-faint text-[11px]">
+          Fuente: INAMHI · modelo GEOGLOWS (ECMWF). Es un pronóstico: ayuda a anticipar, no reemplaza a los
+          sensores.
         </p>
       </div>
     </Card>

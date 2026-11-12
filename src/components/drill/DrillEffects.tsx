@@ -360,3 +360,38 @@ export function DrillPrologue() {
     </div>
   );
 }
+
+/** Franja compacta del simulacro para usar sobre el mapa en pantallas pequeñas (no tapa el mapa). */
+export function DrillChip({ scene, className }: { scene: DrillScene; className?: string }) {
+  const h = Math.floor(scene.simMin / 60);
+  const m = Math.floor(scene.simMin % 60);
+  const ambato = scene.etas.find((e) => /ambato/i.test(e.name));
+  const tone =
+    scene.level === "roja"
+      ? "border-lvl-roja/70"
+      : scene.level === "naranja"
+        ? "border-lvl-naranja/70"
+        : scene.level === "amarilla"
+          ? "border-lvl-amarilla/70"
+          : "border-white/15";
+  return (
+    <div
+      className={cn(
+        "pointer-events-none flex items-center gap-2 overflow-hidden rounded-full border bg-[#070d18]/85 px-2.5 py-1 text-[11px] text-white shadow-lg backdrop-blur",
+        tone,
+        className,
+      )}
+    >
+      <Siren className="text-lvl-amarilla size-3.5 shrink-0 animate-pulse" aria-hidden />
+      <span className="tabular shrink-0 font-mono font-bold">
+        T+{h}:{String(m).padStart(2, "0")}
+      </span>
+      <span className="truncate text-white/75">{formatNumber(scene.rainMmH, 0)} mm/h</span>
+      {ambato && (
+        <span className="tabular ml-auto shrink-0 font-mono font-semibold text-red-300">
+          Ambato {ambato.remainingMin <= 0 ? "ahora" : fmtMin(ambato.remainingMin)}
+        </span>
+      )}
+    </div>
+  );
+}
