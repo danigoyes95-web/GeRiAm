@@ -26,7 +26,7 @@ async function fetchOrgLive(): Promise<OrgLive> {
   const sb = getBrowserClient();
   const [sites, sensors, gateways, cameras, alerts, drills, points, routes] = await Promise.all([
     sb.from("sites").select("*").order("code"),
-    sb.from("sensors").select("*").order("code"),
+    sb.from("sensors").select("*").neq("status", "baja").order("code"),
     sb.from("gateways").select("*").order("name"),
     sb.from("cameras").select("*").order("code"),
     sb.from("alerts").select("*").neq("status", "resuelta").order("started_at", { ascending: false }).limit(200),
@@ -151,7 +151,7 @@ export function pollDrill(qc: QueryClient, siteId: string) {
   drillPoll = (async () => {
     const [alerts, sensors] = await Promise.all([
       sb.from("alerts").select("*").neq("status", "resuelta").order("started_at", { ascending: false }).limit(200),
-      sb.from("sensors").select("*").eq("site_id", siteId),
+      sb.from("sensors").select("*").eq("site_id", siteId).neq("status", "baja"),
     ]);
     qc.setQueryData<OrgLive>(ORG_LIVE_KEY, (d) => {
       if (!d) return d;
