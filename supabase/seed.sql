@@ -56,15 +56,15 @@ values (v_org, geriam._seed_site(v_org, 'chiquiurco'), 'Gateway LoRaWAN Chiquiur
 on conflict (eui) do update set name = excluded.name, lat = excluded.lat, lng = excluded.lng, coverage_radius_m = excluded.coverage_radius_m;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), 'CHQ-CAM-01', 'Cortina — vista general', 'PTZ', '/demo/cams/cam1.mp4', -1.2096352460795485, -78.81112865994616, 40, 'Ladera derecha, frente a la cortina', 'online')
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), 'CHQ-CAM-01', 'Cortina — vista general', 'PTZ', null, -1.2096352460795485, -78.81112865994616, 40, 'Ladera derecha, frente a la cortina', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), 'CHQ-CAM-02', 'Vertedero de excesos', 'fija', '/demo/cams/cam2.mp4', -1.2082786884801129, -78.80933163784358, 300, 'Estribo izquierdo', 'online')
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), 'CHQ-CAM-02', 'Vertedero de excesos', 'fija', null, -1.2082786884801129, -78.80933163784358, 300, 'Estribo izquierdo', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'chiquiurco'), 'CHQ-CAM-03', 'Espejo de agua', 'PTZ', '/demo/cams/cam3.mp4', -1.2081882513068172, -78.81049970221027, 35, 'Torre de toma', 'online')
+values (v_org, geriam._seed_site(v_org, 'chiquiurco'), 'CHQ-CAM-03', 'Espejo de agua', 'PTZ', null, -1.2081882513068172, -78.81049970221027, 35, 'Torre de toma', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.sites (organization_id, zone_id, slug, code, name, river, description, lat, lng, dam_lat, dam_lng,
@@ -89,15 +89,15 @@ values (v_org, geriam._seed_site(v_org, 'mulacorral'), 'Gateway LoRaWAN Mulacorr
 on conflict (eui) do update set name = excluded.name, lat = excluded.lat, lng = excluded.lng, coverage_radius_m = excluded.coverage_radius_m;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), 'MLC-CAM-01', 'Cortina — vista general', 'PTZ', '/demo/cams/cam4.mp4', -1.196744808906253, -78.82700119452873, 330, 'Ladera izquierda', 'online')
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), 'MLC-CAM-01', 'Cortina — vista general', 'PTZ', null, -1.196744808906253, -78.82700119452873, 330, 'Ladera izquierda', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), 'MLC-CAM-02', 'Vertedero de excesos', 'fija', '/demo/cams/cam5.mp4', -1.1955691256534087, -78.8287982082069, 60, 'Estribo derecho', 'online')
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), 'MLC-CAM-02', 'Vertedero de excesos', 'fija', null, -1.1955691256534087, -78.8287982082069, 60, 'Estribo derecho', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'mulacorral'), 'MLC-CAM-03', 'Espejo de agua', 'PTZ', '/demo/cams/cam6.mp4', -1.1952073769602258, -78.8276301493161, 15, 'Torre de toma', 'online')
+values (v_org, geriam._seed_site(v_org, 'mulacorral'), 'MLC-CAM-03', 'Espejo de agua', 'PTZ', null, -1.1952073769602258, -78.8276301493161, 15, 'Torre de toma', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.sites (organization_id, zone_id, slug, code, name, river, description, lat, lng, dam_lat, dam_lng,
@@ -122,15 +122,15 @@ values (v_org, geriam._seed_site(v_org, 'chiquicahua'), 'Gateway LoRaWAN Chiquic
 on conflict (eui) do update set name = excluded.name, lat = excluded.lat, lng = excluded.lng, coverage_radius_m = excluded.coverage_radius_m;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'chiquicahua'), 'CQH-CAM-01', 'Cortina — vista general', 'PTZ', '/demo/cams/cam7.mp4', -1.3525947539204515, -78.76349913717013, 200, 'Ladera izquierda, aguas abajo', 'online')
+values (v_org, geriam._seed_site(v_org, 'chiquicahua'), 'CQH-CAM-01', 'Cortina — vista general', 'PTZ', null, -1.3525947539204515, -78.76349913717013, 200, 'Ladera izquierda, aguas abajo', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'chiquicahua'), 'CQH-CAM-02', 'Vertedero lateral', 'fija', '/demo/cams/cam8.mp4', -1.3535895628267043, -78.76170201326974, 250, 'Estribo derecho', 'online')
+values (v_org, geriam._seed_site(v_org, 'chiquicahua'), 'CQH-CAM-02', 'Vertedero lateral', 'fija', null, -1.3535895628267043, -78.76170201326974, 250, 'Estribo derecho', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (v_org, geriam._seed_site(v_org, 'chiquicahua'), 'CQH-CAM-03', 'Espejo de agua', 'PTZ', '/demo/cams/cam9.mp4', -1.3542226230397743, -78.76278028760997, 180, 'Torre de toma', 'online')
+values (v_org, geriam._seed_site(v_org, 'chiquicahua'), 'CQH-CAM-03', 'Espejo de agua', 'PTZ', null, -1.3542226230397743, -78.76278028760997, 180, 'Torre de toma', 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;
 
 insert into geriam.downstream_points (organization_id, zone_id, name, kind, lat, lng, verificado, poblacion_expuesta)

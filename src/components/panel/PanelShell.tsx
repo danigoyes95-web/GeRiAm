@@ -165,7 +165,8 @@ export function PanelShell({
                 {branding.unit ?? "Sala de operaciones"}
               </span>
             </div>
-            <div className="ml-auto flex items-center gap-2 sm:gap-4">
+            <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-4">
+              <DataSourcePill />
               <StarlinkStrip />
               <div className="hidden items-center gap-2 sm:flex">
                 <span className="label-caps">Estado</span>
@@ -278,5 +279,27 @@ export function PanelShell({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Transparencia: indica si los datos de sensores que se muestran son simulados (demo) o reales. */
+function DataSourcePill() {
+  const { data } = useOrgLive();
+  if (!data) return null;
+  const all = data.sensors.length;
+  const sim = data.sensors.filter((s) => s.data_source === "simulado").length;
+  if (!all) return null;
+  const real = all - sim;
+  const label = sim === all ? "Datos simulados" : real === all ? "Datos reales" : `${real} de ${all} reales`;
+  return (
+    <span
+      className={cn(
+        "hidden items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap md:inline-flex",
+        sim ? "border-lvl-amarilla/50 text-lvl-amarilla" : "border-lvl-normal/50 text-lvl-normal",
+      )}
+      title={`${real} de ${all} sensores con datos reales (integraciones); ${sim} simulados para demostración. Pronóstico del río: INAMHI–GEOGLOWS (real).`}
+    >
+      {label}
+    </span>
   );
 }

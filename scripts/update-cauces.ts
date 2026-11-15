@@ -12,7 +12,11 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 
 async function main() {
   for (const [code, coords] of Object.entries(CAUCES as unknown as Record<string, [number, number][]>)) {
-    const { data, error } = await sb.from("sites").update({ cauce_geojson: { type: "LineString", coordinates: coords } }).eq("code", code).select("code");
+    const { data, error } = await sb
+      .from("sites")
+      .update({ cauce_geojson: { type: "LineString", coordinates: coords } })
+      .eq("code", code)
+      .select("code");
     if (error) throw error;
     console.log(code, data?.length ? `${coords.length} puntos actualizados` : "sin fila");
   }

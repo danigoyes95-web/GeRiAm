@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 /**
  * Genera supabase/seed.sql a partir de config/sites.tungurahua.ts.
  * Uso: pnpm tsx scripts/gen-seed.ts
@@ -77,7 +78,7 @@ on conflict (eui) do update set name = excluded.name, lat = excluded.lat, lng = 
 
   for (const c of s.cameras) {
     out.push(`insert into geriam.cameras (organization_id, site_id, code, name, kind, demo_clip, lat, lng, bearing, position_label, status)
-values (${ORG}, ${site(s.slug)}, ${q(c.code)}, ${q(c.name)}, ${q(c.kind)}, ${q(c.clip)}, ${c.lat}, ${c.lng}, ${c.bearing}, ${q(c.position)}, 'online')
+values (${ORG}, ${site(s.slug)}, ${q(c.code)}, ${q(c.name)}, ${q(c.kind)}, ${q(c.clip && existsSync(`public${c.clip}`) ? c.clip : null)}, ${c.lat}, ${c.lng}, ${c.bearing}, ${q(c.position)}, 'online')
 on conflict (organization_id, code) do update set name = excluded.name, demo_clip = excluded.demo_clip, lat = excluded.lat, lng = excluded.lng, position_label = excluded.position_label;`);
   }
 }
@@ -101,8 +102,14 @@ on conflict (site_id, point_id) do update set distancia_km = excluded.distancia_
   tiempo_transito_normal_min = excluded.tiempo_transito_normal_min, fuente = excluded.fuente;`);
   }
   for (const [idx, se] of s.sensors.entries()) {
-    const gw = se.downstreamPoint ? "null" : `(select id from geriam.gateways where eui = ${q(s.gateway.eui)})`;
-    const eui = se.downstreamPoint ? "null" : q(`70B3D57ED00${{ CHQ: "1", MLC: "2", CQH: "3" }[s.code as "CHQ" | "MLC" | "CQH"] ?? "9"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`);
+    const gw = se.downstreamPoint
+      ? "null"
+      : `(select id from geriam.gateways where eui = ${q(s.gateway.eui)})`;
+    const eui = se.downstreamPoint
+      ? "null"
+      : q(
+          `70B3D57ED00${{ CHQ: "1", MLC: "2", CQH: "3" }[s.code as "CHQ" | "MLC" | "CQH"] ?? "9"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`,
+        );
     out.push(`insert into geriam.sensors (organization_id, site_id, gateway_id, code, name, type, dev_eui, unit, decimals, lat, lng, position_label,
   battery_pct, rssi, snr, report_interval_s, thresholds, status, data_source, metadata)
 values (${ORG}, ${site(s.slug)}, ${gw}, ${q(se.code)}, ${q(se.name)}, ${q(se.type)}, ${eui}, ${q(se.unit)}, ${se.decimals}, ${se.lat}, ${se.lng}, ${q(se.position)},
@@ -111,7 +118,9 @@ values (${ORG}, ${site(s.slug)}, ${gw}, ${q(se.code)}, ${q(se.name)}, ${q(se.typ
 on conflict (organization_id, code) do update set name = excluded.name, unit = excluded.unit, decimals = excluded.decimals, lat = excluded.lat, lng = excluded.lng,
   position_label = excluded.position_label, report_interval_s = excluded.report_interval_s, thresholds = excluded.thresholds, metadata = excluded.metadata;`);
     if (se.downstreamPoint) {
-      out.push(`update geriam.downstream_points set nivel_rio_sensor_id = (select id from geriam.sensors where organization_id = ${ORG} and code = ${q(se.code)}) where id = ${point(se.downstreamPoint)};`);
+      out.push(
+        `update geriam.downstream_points set nivel_rio_sensor_id = (select id from geriam.sensors where organization_id = ${ORG} and code = ${q(se.code)}) where id = ${point(se.downstreamPoint)};`,
+      );
     }
   }
   for (const r of siteRules(s)) {

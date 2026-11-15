@@ -21,8 +21,9 @@ import {
 import { getBrowserClient } from "@/lib/supabase/browser";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { IntegrationsTab } from "./IntegrationsTab";
 
-type Tab = "umbrales" | "reglas" | "puntos" | "escalamiento" | "usuarios" | "organizacion";
+type Tab = "umbrales" | "reglas" | "puntos" | "integraciones" | "escalamiento" | "usuarios" | "organizacion";
 const LV = ["amarilla", "naranja", "roja"] as const;
 
 async function audit(
@@ -214,6 +215,7 @@ export function ConfigPanel() {
             { value: "umbrales", label: "Umbrales" },
             { value: "reglas", label: "Reglas" },
             { value: "puntos", label: "Puntos" },
+            { value: "integraciones", label: "Integraciones" },
             { value: "escalamiento", label: "Escalamiento" },
             { value: "usuarios", label: "Usuarios" },
             { value: "organizacion", label: "Organización" },
@@ -296,6 +298,8 @@ export function ConfigPanel() {
         </Card>
       ) : tab === "puntos" ? (
         <PointsTab />
+      ) : tab === "integraciones" ? (
+        <IntegrationsTab />
       ) : tab === "escalamiento" ? (
         <Card>
           <CardHeader
