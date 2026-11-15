@@ -37,6 +37,9 @@ import type { DrillRun } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 import { useDrillScene } from "@/components/drill/DrillEffects";
 import { drillSites } from "@/lib/drill/scene";
+import { DEBRIS, type Debris } from "@/lib/flood/impact";
+import { useDamInputs, useFloodData, useImpact } from "@/lib/flood/useImpact";
+import { HazardLegend, ZoneRanking } from "@/components/panel/impact/ImpactExplorer";
 import { levelFor } from "@/lib/alerts/engine";
 
 const ICON: Record<ScenarioId, LucideIcon> = {
@@ -129,6 +132,7 @@ function Picker({
   const [busy, setBusy] = useState(false);
   // rotura: presas que fallan, en orden (la primera falla primero; las demás, desfasadas)
   const [broken, setBroken] = useState<string[]>(["chiquiurco", "mulacorral"]);
+  const [debris, setDebris] = useState<Debris>("moderado");
   const def = SCENARIOS[scenario];
   const multi = !!def.multiSite;
   const chosen = multi
@@ -153,6 +157,7 @@ function Picker({
         scenario,
         speed: Number(speed),
         extra_site_ids: multi ? chosen.slice(1).map((s) => s.id) : [],
+        debris,
       });
       toast.success("Simulacro iniciado", { description: def.title });
       onStarted();
@@ -261,7 +266,20 @@ function Picker({
                 })}
               </div>
             </fieldset>
-          ) : (
+          ) : null}
+          {multi && (
+            <div className="space-y-1">
+              <span className="text-fg-muted block text-xs">Lo que arrastra la crecida</span>
+              <SegmentedControl<Debris>
+                label="Escombros"
+                size="md"
+                value={debris}
+                onChange={setDebris}
+                options={(Object.keys(DEBRIS) as Debris[]).map((k) => ({ value: k, label: DEBRIS[k].label }))}
+              />
+            </div>
+          )}
+          {multi ? null : (
             <label className="space-y-1">
               <span className="text-fg-muted block text-xs">Embalse</span>
               <Select value={siteSlug} onChange={(e) => setSiteSlug(e.target.value)} aria-label="Embalse">
@@ -629,6 +647,7 @@ function Active({
             )}
           </div>
           {rupture && scene && <RuptureBoard scene={scene} />}
+          {rupture && scene && <RuptureImpact scene={scene} />}
           <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
             <Card>
               <CardHeader title="Vaso" subtitle={site?.name} />
@@ -795,6 +814,37 @@ function RuptureBoard({ scene }: { scene: NonNullable<ReturnType<typeof useDrill
             </tbody>
           </table>
         </div>
+      )}
+    </Card>
+  );
+}
+
+/** Rotura: zonas más afectadas hasta el minuto simulado actual (envolvente de la crecida). */
+function RuptureImpact({ scene }: { scene: NonNullable<ReturnType<typeof useDrillScene>> }) {
+  const { data } = useOrgLive();
+  const flood = useFloodData();
+  const dams = useDamInputs(data, scene.breaches);
+  const impact = useImpact(flood.data, dams, scene.debris, scene.simMin);
+  const t = impact?.totals;
+  const severe = t ? t.buildingsByClass[3] + t.buildingsByClass[4] : 0;
+  return (
+    <Card>
+      <CardHeader
+        title="Zonas más afectadas hasta ahora"
+        subtitle={
+          t && t.areaHa > 0
+            ? `${formatNumber(t.areaHa, 0)} ha inundadas · ${formatNumber(severe, 0)} edificaciones en peligro alto o extremo · ${formatNumber(t.bridgesHit, 0)} puentes · ${DEBRIS[scene.debris].label.toLowerCase()}`
+            : `Crecida con ${DEBRIS[scene.debris].label.toLowerCase()} · estimación de primer nivel`
+        }
+        icon={<Siren />}
+        actions={<HazardLegend className="hidden md:flex" />}
+      />
+      {impact ? (
+        <ZoneRanking impact={impact} limit={6} tNow={scene.simMin} />
+      ) : (
+        <CardBody>
+          <p className="text-fg-muted text-sm">Cargando el modelo del valle…</p>
+        </CardBody>
       )}
     </Card>
   );

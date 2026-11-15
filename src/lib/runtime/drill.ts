@@ -7,6 +7,7 @@ import { evaluate, type OpenAlert } from "../alerts/engine";
 import { stepSite, type SiteState } from "../sim/physics";
 import { emitReadings } from "../sim/telemetry";
 import { ROTURA_STAGGER, SCENARIOS, type ScenarioId } from "../sim/scenarios";
+import { DEBRIS, type Debris } from "../flood/impact";
 import { volumeAt } from "../hydro/curve";
 import {
   audit,
@@ -49,6 +50,8 @@ export interface DrillState extends SiteDrill {
   phase: string;
   events: { min: number; label: string }[];
   extra?: Record<string, SiteDrill>;
+  /** rotura: lo que arrastra la crecida (agua, escombros o lodo) */
+  debris?: Debris;
   /** embalses del simulacro sin su estado físico (lo lee el cliente: la columna snapshot no se le envía) */
   sites?: { id: string; code: string; role: DrillSnapshotSite["role"]; offset_min: number }[];
 }
@@ -117,6 +120,7 @@ export async function startDrill(
     speed: number;
     actor: { id: string; name: string };
     extraSiteIds?: string[];
+    debris?: Debris;
   },
 ) {
   const b = await loadOrgBundle(sb, args.orgId);
@@ -143,6 +147,7 @@ export async function startDrill(
     },
   ];
   if (def.multiSite) {
+    state.debris = args.debris ?? "agua";
     // presas adicionales que fallan (desfasadas) + embalses dueños de las estaciones del río (pasivos)
     const extra = (args.extraSiteIds ?? []).filter((id, i, a) => id !== site.id && a.indexOf(id) === i);
     const stationOwners = b.sites
@@ -170,7 +175,12 @@ export async function startDrill(
     const names = snapSites
       .filter((x) => x.role === "rotura")
       .map((x) => b.sites.find((s) => s.id === x.id)?.name.replace("Embalse ", "") ?? x.code);
-    state.events = [{ min: 0, label: `Inicio del simulacro: ${def.title} (${names.join(" + ")})` }];
+    state.events = [
+      {
+        min: 0,
+        label: `Inicio del simulacro: ${def.title} (${names.join(" + ")}) · ${DEBRIS[state.debris].label.toLowerCase()}`,
+      },
+    ];
   }
   state.sites = snapSites.map(({ id, code, role, offset_min }) => ({ id, code, role, offset_min }));
   const ins = await sb
@@ -234,6 +244,9 @@ async function advance(sb: Admin, b: OrgBundle, drill: NonNullable<OrgBundle["dr
       return s ? [{ site: s, sd, primary: false }] : [];
     }),
   ].map((e) => ({ ...e, p: paramsFor(e.site), sensors: simSensorsFor(b, e.site) }));
+  // los escombros aumentan el volumen de la onda que ven las estaciones del río
+  const bulking = st.debris ? DEBRIS[st.debris].bulking : 1;
+  for (const e of entries) for (const sn of e.sensors) if (sn.station) sn.station.bulking = bulking;
   const inDrill = new Set(entries.map((e) => e.site.id));
   const others: Record<string, SiteState> = {};
   for (const s of b.sites) if (!inDrill.has(s.id)) others[s.code] = stateFor(b, s, Date.now());
@@ -448,8 +461,9 @@ export async function controlDrill(
     const extraSiteIds = (snap.sites ?? [])
       .filter((x) => x.role === "rotura" && x.id !== siteId)
       .map((x) => x.id);
+    const debris = (drill.state as unknown as DrillState | null)?.debris;
     await finishDrill(sb, drill.id, snap, actor, true);
-    return startDrill(sb, { orgId, siteId, scenario, speed, actor, extraSiteIds });
+    return startDrill(sb, { orgId, siteId, scenario, speed, actor, extraSiteIds, debris });
   }
   const snap = (drill.snapshot ?? {}) as DrillSnapshot;
   await finishDrill(sb, drill.id, snap, actor, false);

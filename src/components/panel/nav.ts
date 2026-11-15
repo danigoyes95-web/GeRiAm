@@ -9,6 +9,7 @@ import {
   Settings,
   ScrollText,
   Activity,
+  MapPinned,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/domain/types";
@@ -29,6 +30,7 @@ export const PANEL_NAV_ALL: NavItem[] = [
   { href: "/panel/alertas", label: "Alertas", icon: BellRing },
   { href: "/panel/camaras", label: "Cámaras", icon: Video },
   { href: "/panel/simulacro", label: "Simulacro", icon: Siren, roles: ["admin", "operador"] },
+  { href: "/panel/impacto", label: "Zonas de impacto", icon: MapPinned },
   { href: "/panel/reportes", label: "Reportes", icon: FileText },
   { href: "/panel/bitacora", label: "Bitácora", icon: ScrollText, roles: ["admin", "operador", "observador"] },
   { href: "/panel/estado-sistema", label: "Estado del sistema", icon: Activity, roles: ["admin", "operador", "observador"] },

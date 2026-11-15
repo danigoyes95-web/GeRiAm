@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { DrillScene } from "@/lib/drill/scene";
-import type { Map as MapboxMap, Marker, GeoJSONSource } from "mapbox-gl";
+import type { Map as MapboxMap, Marker, GeoJSONSource, CanvasSource } from "mapbox-gl";
+import { paintHazard, type FloodData } from "@/lib/flood/impact";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type * as GeoJSON from "geojson";
 import { MapPinOff } from "lucide-react";
@@ -41,13 +42,24 @@ export interface BasinMapProps {
   selected?: MapSelection | null;
   className?: string;
   /** controla un vuelo programático (cambia el nonce para repetir) */
-  flight?: { target: "cuenca" | "ambato" | "site"; siteId?: string; nonce: number } | null;
+  flight?: {
+    target: "cuenca" | "ambato" | "site" | "lugar";
+    siteId?: string;
+    /** destino libre (target "lugar") */
+    lng?: number;
+    lat?: number;
+    zoom?: number;
+    pitch?: number;
+    nonce: number;
+  } | null;
   /** Mostrar solo nivel de detalle compacto (app móvil) */
   compact?: boolean;
   /** Sin mensajes de carga/error (fondo decorativo del portal) */
   quiet?: boolean;
   /** Escena del simulacro en curso: lluvia 3D, frente de crecida por el cauce y llegada a cada punto */
   scene?: DrillScene | null;
+  /** mapa de peligro de la crecida (clase por celda del valle) */
+  hazard?: { fd: FloodData; cls: Uint8Array } | null;
 }
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -134,6 +146,7 @@ export function BasinMap({
   compact,
   quiet,
   scene,
+  hazard = null,
 }: BasinMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
@@ -565,9 +578,67 @@ export function BasinMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !alive(map) || !map.getLayer("sngr-flood")) return;
-    map.setLayoutProperty("sngr-flood", "visibility", floodOn ? "visible" : "none");
-    map.setPaintProperty("sngr-flood", "raster-opacity", floodOn ? 0.72 : 0);
-  }, [ready, floodOn]);
+    // con el mapa de peligro propio se oculta la susceptibilidad SNGR (evita dos manchas superpuestas)
+    const show = floodOn && !hazard;
+    map.setLayoutProperty("sngr-flood", "visibility", show ? "visible" : "none");
+    map.setPaintProperty("sngr-flood", "raster-opacity", show ? 0.72 : 0);
+  }, [ready, floodOn, hazard]);
+
+  // mapa de peligro: una imagen alineada con la rejilla del relieve (cada píxel = una celda de ~19 m)
+  const hazardCanvas = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !alive(map)) return;
+    if (!hazard) {
+      if (map.getLayer("hazard")) map.setLayoutProperty("hazard", "visibility", "none");
+      return;
+    }
+    const m = hazard.fd.meta;
+    let cv = hazardCanvas.current;
+    if (!cv || cv.width !== m.width || cv.height !== m.height) {
+      cv = document.createElement("canvas");
+      cv.width = m.width;
+      cv.height = m.height;
+      hazardCanvas.current = cv;
+    }
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
+    const img = ctx.createImageData(m.width, m.height);
+    paintHazard(hazard.fd, hazard.cls, img.data);
+    ctx.putImageData(img, 0, 0);
+    try {
+      if (!map.getSource("hazard"))
+        map.addSource("hazard", {
+          type: "canvas",
+          canvas: cv,
+          coordinates: m.corners as [[number, number], [number, number], [number, number], [number, number]],
+          animate: false,
+        });
+      if (!map.getLayer("hazard"))
+        map.addLayer(
+          {
+            id: "hazard",
+            type: "raster",
+            source: "hazard",
+            paint: { "raster-opacity": 0.95, "raster-resampling": "linear", "raster-fade-duration": 0 },
+          },
+          map.getLayer("flood-glow") ? "flood-glow" : undefined,
+        );
+      map.setLayoutProperty("hazard", "visibility", "visible");
+      // fuente de lienzo estática: se relee el lienzo un cuadro y se congela
+      const src = map.getSource("hazard") as CanvasSource | undefined;
+      src?.play();
+      requestAnimationFrame(() => {
+        try {
+          if (alive(map)) src?.pause();
+        } catch {
+          /* mapa desmontado */
+        }
+      });
+    } catch (e) {
+      console.warn("[mapa] capa de peligro", e);
+    }
+  }, [ready, hazard, dataNonce]);
 
   // lluvia 3D y niebla de tormenta
   const rainBucket = scene ? Math.round(Math.min(scene.rainMmH, 60) / 5) : 0;
@@ -773,6 +844,15 @@ export function BasinMap({
         pitch: center.pitch,
         bearing: center.bearing,
         duration: 2600,
+        essential: true,
+      });
+    } else if (flight.target === "lugar" && flight.lng !== undefined && flight.lat !== undefined) {
+      map.flyTo({
+        center: [flight.lng, flight.lat],
+        zoom: flight.zoom ?? 14.2,
+        pitch: flight.pitch ?? 58,
+        bearing: map.getBearing(),
+        duration: 2200,
         essential: true,
       });
     } else if (flight.target === "site") {

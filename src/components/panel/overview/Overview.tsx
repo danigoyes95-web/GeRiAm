@@ -4,6 +4,7 @@ import { Layers, Mountain, Navigation, RadioTower, Video } from "lucide-react";
 import { BasinMap, type MapSelection } from "@/components/map/BasinMap";
 import { DrillChip, DrillHud, useDrillScene } from "@/components/drill/DrillEffects";
 import { RiverForecast } from "@/components/inamhi/RiverForecast";
+import { useDamInputs, useFloodData, useImpact } from "@/lib/flood/useImpact";
 import { usePanel } from "@/components/panel/PanelContext";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,20 @@ export function Overview() {
     nonce: number;
   } | null>(null);
   const [coverage, setCoverage] = useState(true);
+  // rotura: mancha de peligro de la crecida hasta el minuto simulado
+  const rupture = scene?.scenario === "rotura";
+  const flood = useFloodData(rupture);
+  const dams = useDamInputs(data, rupture ? (scene?.breaches ?? []) : []);
+  const impact = useImpact(
+    rupture ? flood.data : undefined,
+    dams,
+    scene?.debris ?? "agua",
+    scene?.simMin ?? 0,
+  );
+  const hazard = useMemo(
+    () => (flood.data && impact && impact.totals.areaHa > 0 ? { fd: flood.data, cls: impact.cls } : null),
+    [flood.data, impact],
+  );
   const [showSensors, setShowSensors] = useState(true);
 
   const keySensorIds = useMemo(
@@ -95,6 +110,7 @@ export function Overview() {
                 selected={sel}
                 flight={flight}
                 scene={scene}
+                hazard={hazard}
               />
             </ErrorBoundary>
           ) : (

@@ -10,6 +10,8 @@ const Body = z.object({
   scenario: z.enum(["tormenta", "estructural", "comunicacion", "rotura"]),
   /** rotura de varias presas: embalses adicionales (en orden de falla) */
   extra_site_ids: z.array(z.uuid()).max(5).default([]),
+  /** rotura: lo que arrastra la crecida */
+  debris: z.enum(["agua", "moderado", "lodo"]).default("agua"),
   speed: z.union([z.literal(30), z.literal(60)]).default(60),
 });
 
@@ -28,6 +30,7 @@ export const POST = handle(async (req: Request) => {
       speed: body.speed,
       actor: { id: ctx.userId, name: ctx.profile.full_name },
       extraSiteIds: body.scenario === "rotura" ? body.extra_site_ids : [],
+      debris: body.debris,
     });
     return NextResponse.json({ ok: true, drill });
   } catch (e) {

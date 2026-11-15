@@ -224,6 +224,7 @@ function RuptureTiles({ scene }: { scene: DrillScene }) {
   const next = scene.etas.find((e) => e.remainingMin > 0);
   const reached = scene.etas.filter((e) => e.remainingMin <= 0);
   const people = reached.reduce((a, e) => a + (e.poblacion ?? 0), 0);
+  const debris = { agua: "Solo agua", moderado: "Con escombros", lodo: "Flujo de lodo" }[scene.debris];
   return (
     <div className="mt-2.5 grid grid-cols-2 gap-2 text-[11px]">
       <div className="rounded-md bg-white/5 p-1.5">
@@ -259,6 +260,10 @@ function RuptureTiles({ scene }: { scene: DrillScene }) {
             {scene.etas.length ? "Llegó a todos" : "Aún sin brecha"}
           </div>
         )}
+      </div>
+      <div className="col-span-2 flex items-center justify-between rounded-md bg-white/5 px-1.5 py-1 text-white/75">
+        <span>Crecida</span>
+        <b className={cn("text-white", scene.debris !== "agua" && "text-lvl-naranja")}>{debris}</b>
       </div>
       {reached.length > 0 && (
         <div className="col-span-2 rounded-md bg-white/5 px-1.5 py-1 text-white/75">

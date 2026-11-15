@@ -27,6 +27,9 @@ export interface DrillScene {
   floods: { siteId: string; fraction: number }[];
   /** presas que fallan en el escenario de rotura (ids) */
   brokenSiteIds: string[];
+  /** rotura: presas con el minuto en que se abre su brecha, y lo que arrastra la crecida */
+  breaches: { siteId: string; breachAtMin: number }[];
+  debris: "agua" | "moderado" | "lodo";
   etas: {
     name: string;
     lat: number;
@@ -50,7 +53,9 @@ type SnapSite = { id: string; code: string; role: string; offset_min: number };
 /** Embalses del simulacro (state.sites; snapshot.sites en filas antiguas). */
 export function drillSites(drill: { state?: unknown; snapshot?: unknown }): SnapSite[] {
   return (
-    ((drill.state ?? {}) as { sites?: SnapSite[] }).sites ?? ((drill.snapshot ?? {}) as { sites?: SnapSite[] }).sites ?? []
+    ((drill.state ?? {}) as { sites?: SnapSite[] }).sites ??
+    ((drill.snapshot ?? {}) as { sites?: SnapSite[] }).sites ??
+    []
   );
 }
 
@@ -259,6 +264,13 @@ export function drillScene(data: OrgLive | undefined, now: number): DrillScene |
     flood,
     floods,
     brokenSiteIds,
+    breaches:
+      drill.scenario === "rotura"
+        ? (snapSites.length ? snapSites : [{ id: site.id, code: site.code, role: "rotura", offset_min: 0 }])
+            .filter((x) => x.role === "rotura")
+            .map((x) => ({ siteId: x.id, breachAtMin: ROTURA_BREACH_AT + x.offset_min }))
+        : [],
+    debris: ((drill.state ?? {}) as { debris?: DrillScene["debris"] }).debris ?? "agua",
     etas,
     topAlert: top,
     startedAt: new Date(drill.started_at).getTime(),
