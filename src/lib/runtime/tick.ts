@@ -38,7 +38,13 @@ export interface TickSummary {
   ms: number;
 }
 
-export function readingRows(orgId: string, site: SiteState, readings: EmittedReading[], drillRunId: string | null = null, tsOverride?: string) {
+export function readingRows(
+  orgId: string,
+  site: SiteState,
+  readings: EmittedReading[],
+  drillRunId: string | null = null,
+  tsOverride?: string,
+) {
   const ts = tsOverride ?? new Date(site.t).toISOString();
   return readings.map((r) => ({
     sensor_id: r.sensorId,
@@ -69,24 +75,49 @@ export function stateFor(b: OrgBundle, site: SiteRow, fallbackT: number): SiteSt
 export async function saveStates(sb: Admin, b: OrgBundle, states: Record<string, SiteState>) {
   const rows = b.sites
     .filter((s) => states[s.code])
-    .map((s) => ({ site_id: s.id, organization_id: b.org.id, sim_time: new Date(states[s.code].t).toISOString(), state: states[s.code] as never, updated_at: new Date().toISOString() }));
+    .map((s) => ({
+      site_id: s.id,
+      organization_id: b.org.id,
+      sim_time: new Date(states[s.code].t).toISOString(),
+      state: states[s.code] as never,
+      updated_at: new Date().toISOString(),
+    }));
   if (!rows.length) return;
   const r = await sb.from("sim_state").upsert(rows, { onConflict: "site_id" });
   if (r.error) throw new Error(`sim_state: ${r.error.message}`);
 }
 
-async function evaluateSite(sb: Admin, b: OrgBundle, site: SiteRow, now: number, overrides: Record<string, { value: number | null; at: number | null }>) {
+async function evaluateSite(
+  sb: Admin,
+  b: OrgBundle,
+  site: SiteRow,
+  now: number,
+  overrides: Record<string, { value: number | null; at: number | null }>,
+) {
   const ids = b.sensors.filter((s) => s.site_id === site.id).map((s) => s.id);
   const [history, rain, open] = await Promise.all([
     loadHistory(sb, ids, now - 6.5 * 3600 * 1000),
     rain24h(sb, site.id, now),
-    sb.from("alerts").select("*").eq("organization_id", b.org.id).eq("site_id", site.id).neq("status", "resuelta").is("drill_run_id", null),
+    sb
+      .from("alerts")
+      .select("*")
+      .eq("organization_id", b.org.id)
+      .eq("site_id", site.id)
+      .neq("status", "resuelta")
+      .is("drill_run_id", null),
   ]);
   if (open.error) throw new Error(open.error.message);
   const p = paramsFor(site);
   const result = evaluate({
     now,
-    site: { id: site.id, code: site.code, name: site.name, zoneId: site.zone_id, namo: p.namo, cresta: p.cresta },
+    site: {
+      id: site.id,
+      code: site.code,
+      name: site.name,
+      zoneId: site.zone_id,
+      namo: p.namo,
+      cresta: p.cresta,
+    },
     sensors: evalSensors(b, site, overrides),
     history,
     rain24h: rain,
@@ -98,7 +129,21 @@ async function evaluateSite(sb: Admin, b: OrgBundle, site: SiteRow, now: number,
   return result.drafts.length;
 }
 
-export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Omit<TickSummary, "orgs" | "ms">> {
+/** Evalúa ya las reglas de alerta de unos embalses (tras recibir datos reales), sin esperar al ciclo de 60 s. */
+export async function evaluateSitesNow(sb: Admin, orgId: string, siteIds: string[], now = Date.now()) {
+  const b = await loadOrgBundle(sb, orgId);
+  const skip = new Set(drillSiteIds(b.drill));
+  let n = 0;
+  for (const site of b.sites.filter((s) => siteIds.includes(s.id) && !skip.has(s.id)))
+    n += await evaluateSite(sb, b, site, now, {});
+  return n;
+}
+
+export async function tickOrg(
+  sb: Admin,
+  orgId: string,
+  now: number,
+): Promise<Omit<TickSummary, "orgs" | "ms">> {
   const b = await loadOrgBundle(sb, orgId);
   // los embalses del simulacro en curso los avanza el simulacro (se restauran al finalizar)
   const drillSites = new Set(drillSiteIds(b.drill));
@@ -126,8 +171,15 @@ export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Om
       states[site.code] = stepSite(paramsFor(site), st, STEP_BACKFILL_S);
     }
     for (const site of sites) {
-      const st = { ...states[site.code], lastEmit: { ...states[site.code].lastEmit }, battery: { ...states[site.code].battery } };
-      const readings = emitReadings(st, simSensorsFor(b, site), states, { mode: "backfill", stepS: STEP_BACKFILL_S });
+      const st = {
+        ...states[site.code],
+        lastEmit: { ...states[site.code].lastEmit },
+        battery: { ...states[site.code].battery },
+      };
+      const readings = emitReadings(st, simSensorsFor(b, site), states, {
+        mode: "backfill",
+        stepS: STEP_BACKFILL_S,
+      });
       states[site.code] = st;
       collect(site, st, readings);
     }
@@ -138,7 +190,11 @@ export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Om
     if (dt > 0) states[site.code] = stepSite(paramsFor(site), states[site.code], dt);
   }
   for (const site of sites) {
-    const st = { ...states[site.code], lastEmit: { ...states[site.code].lastEmit }, battery: { ...states[site.code].battery } };
+    const st = {
+      ...states[site.code],
+      lastEmit: { ...states[site.code].lastEmit },
+      battery: { ...states[site.code].battery },
+    };
     const readings = emitReadings(st, simSensorsFor(b, site), states, { mode: "live" });
     states[site.code] = st;
     collect(site, st, readings);
@@ -156,29 +212,50 @@ export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Om
     if (gw) {
       const status = st.stlOnline ? (st.stlLatency > 150 ? "degradado" : "online") : "offline";
       if (status !== gw.status || st.stlOnline) {
-        await sb.from("gateways").update({ status, ...(st.stlOnline ? { last_seen_at: nowIso } : {}) }).eq("id", gw.id);
+        await sb
+          .from("gateways")
+          .update({ status, ...(st.stlOnline ? { last_seen_at: nowIso } : {}) })
+          .eq("id", gw.id);
       }
     }
     if (quarter) {
       for (const r of rows.filter((x) => b.sensors.find((s) => s.id === x.sensor_id)?.site_id === site.id)) {
         const raw = r.raw as unknown as { battery?: number; rssi?: number; snr?: number };
         if (raw.battery === undefined) continue;
-        await sb.from("sensors").update({ battery_pct: raw.battery, rssi: raw.rssi, snr: raw.snr }).eq("id", r.sensor_id);
+        await sb
+          .from("sensors")
+          .update({ battery_pct: raw.battery, rssi: raw.rssi, snr: raw.snr })
+          .eq("id", r.sensor_id);
       }
     }
   }
 
   // Red de seguridad: alertas que quedaron abiertas de simulacros ya finalizados
-  const orphan = await sb.from("drill_runs").select("id").eq("organization_id", b.org.id).eq("status", "finalizado").gte("ended_at", new Date(now - 6 * 3600_000).toISOString());
+  const orphan = await sb
+    .from("drill_runs")
+    .select("id")
+    .eq("organization_id", b.org.id)
+    .eq("status", "finalizado")
+    .gte("ended_at", new Date(now - 6 * 3600_000).toISOString());
   const orphanIds = (orphan.data ?? []).map((d) => d.id);
   if (orphanIds.length) {
-    await sb.from("alerts").update({ status: "resuelta", resolved_at: new Date(now).toISOString() }).in("drill_run_id", orphanIds).neq("status", "resuelta");
+    await sb
+      .from("alerts")
+      .update({ status: "resuelta", resolved_at: new Date(now).toISOString() })
+      .in("drill_run_id", orphanIds)
+      .neq("status", "resuelta");
   }
 
   // Alertas
   let evaluated = 0;
-  for (const site of b.sites.filter((s) => !drillSites.has(s.id))) evaluated += await evaluateSite(sb, b, site, now, overrides);
-  const openAll = await sb.from("alerts").select("*").eq("organization_id", b.org.id).neq("status", "resuelta").is("drill_run_id", null);
+  for (const site of b.sites.filter((s) => !drillSites.has(s.id)))
+    evaluated += await evaluateSite(sb, b, site, now, overrides);
+  const openAll = await sb
+    .from("alerts")
+    .select("*")
+    .eq("organization_id", b.org.id)
+    .neq("status", "resuelta")
+    .is("drill_run_id", null);
   const escalations = await runEscalations(sb, b, openAll.data ?? [], { now });
 
   // Simulacro sin conductor (página cerrada): el cron lo mantiene avanzando.
@@ -187,13 +264,27 @@ export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Om
     await stepDrill(sb, b.drill.id, (now - new Date(b.drill.last_step_at).getTime()) / 1000);
     drillStepped = true;
   }
-  return { readings: rows.length, sites: sites.map((s) => s.code), alertsEvaluated: evaluated, escalations, drillStepped };
+  return {
+    readings: rows.length,
+    sites: sites.map((s) => s.code),
+    alertsEvaluated: evaluated,
+    escalations,
+    drillStepped,
+  };
 }
 
 export async function runTick(sb: Admin, now = Date.now()): Promise<TickSummary> {
   const t0 = Date.now();
   const orgs = await listOrgIds(sb);
-  const acc: TickSummary = { orgs: orgs.length, readings: 0, sites: [], alertsEvaluated: 0, escalations: 0, drillStepped: false, ms: 0 };
+  const acc: TickSummary = {
+    orgs: orgs.length,
+    readings: 0,
+    sites: [],
+    alertsEvaluated: 0,
+    escalations: 0,
+    drillStepped: false,
+    ms: 0,
+  };
   for (const id of orgs) {
     const r = await tickOrg(sb, id, now);
     acc.readings += r.readings;
