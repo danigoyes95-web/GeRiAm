@@ -59,11 +59,13 @@ def load_dem():
     return dem, x0, y0
 
 
-def priority_flood(dem):
-    """Devuelve, para cada celda, el índice de la celda hacia la que drena (o -1 en los bordes)."""
+def priority_flood(dem, with_order=False):
+    """Devuelve, para cada celda, el índice de la celda hacia la que drena (o -1 en los bordes).
+    Con with_order también el orden de proceso (cada celda aparece después de la celda a la que drena)."""
     h, w = dem.shape
     rec = np.full(h * w, -1, dtype=np.int64)
     done = np.zeros(h * w, dtype=bool)
+    order = [] if with_order else None
     pq = []
     for r in range(h):
         for c in (0, w - 1):
@@ -77,6 +79,8 @@ def priority_flood(dem):
     eps = 1e-4
     while pq:
         z, i = heapq.heappop(pq)
+        if order is not None:
+            order.append(i)
         r, c = divmod(i, w)
         for dr, dc in nb:
             rr, cc = r + dr, c + dc
@@ -86,7 +90,7 @@ def priority_flood(dem):
                     done[j] = True
                     rec[j] = i
                     heapq.heappush(pq, (max(dem[rr, cc], z + eps), j))
-    return rec
+    return (rec, np.array(order, dtype=np.int64)) if with_order else rec
 
 
 def rdp(pts, tol):
@@ -113,11 +117,9 @@ def chaikin(pts, it=2):
     return pts
 
 
-def main():
-    dem, x0, y0 = load_dem()
+def trace_paths(dem, x0, y0, rec):
+    """Recorrido (filas, columnas) del cauce aguas abajo de cada presa, siguiendo las direcciones de flujo."""
     h, w = dem.shape
-    print(f"DEM {w}×{h} celdas, {dem.min():.0f}–{dem.max():.0f} m", file=sys.stderr)
-    rec = priority_flood(dem)
     ax, ay = tile_xy(*AMBATO, Z)
     amb = ((ay - y0) * 256, (ax - x0) * 256)
     out = {}
@@ -148,6 +150,17 @@ def main():
             if past is not None and (len(path) - past) * 19 * 1.2 > PAST_AMBATO_KM * 1000:
                 break
             i = rec[i]
+        out[code] = (path, closest)
+    return out
+
+
+def main():
+    dem, x0, y0 = load_dem()
+    h, w = dem.shape
+    print(f"DEM {w}×{h} celdas, {dem.min():.0f}–{dem.max():.0f} m", file=sys.stderr)
+    rec = priority_flood(dem)
+    out = {}
+    for code, (path, closest) in trace_paths(dem, x0, y0, rec).items():
         ll = [pix_to_lonlat(c + 0.5, r + 0.5, x0, y0, Z) for r, c in path]
         km = sum(math.hypot((b[0] - a[0]) * 111.32 * math.cos(math.radians(a[1])), (b[1] - a[1]) * 110.57) for a, b in zip(ll[:-1], ll[1:]))
         simp = chaikin(rdp(ll, 0.00018), 2)

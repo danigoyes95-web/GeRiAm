@@ -411,6 +411,8 @@ export interface DownstreamStation {
   /** llegada del frente de onda por rotura (min) y distancia por el cauce (km), por código de sitio */
   arrival?: Record<string, number>;
   km?: Record<string, number>;
+  /** factor de volumen por escombros de la onda de rotura (1 = agua clara) */
+  bulking?: number;
 }
 
 /** Caudal y nivel del río en una estación aguas abajo (desfase = tiempo de tránsito). */
@@ -426,7 +428,7 @@ export function downstreamStage(
     if (!s) continue;
     q += qoutAgo(s, minutes);
     if (s.breachHist && st.arrival?.[code] !== undefined)
-      q += breachWaveAt(s, st.arrival[code], st.km?.[code] ?? 0);
+      q += breachWaveAt(s, st.arrival[code], st.km?.[code] ?? 0) * (st.bulking ?? 1);
     localRain += s.sFast / K_FAST_S;
     n++;
   }
