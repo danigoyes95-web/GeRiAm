@@ -46,7 +46,10 @@ export interface RainClimate {
 export const DEFAULT_CLIMATE: RainClimate = {
   meanMmDay: 2.78,
   monthlyFactor: [0.966, 0.838, 1.008, 1.046, 1.266, 1.577, 1.54, 0.84, 0.681, 0.682, 0.814, 0.743],
-  diurnal: [0.048, 0.047, 0.053, 0.051, 0.048, 0.046, 0.044, 0.043, 0.037, 0.032, 0.033, 0.029, 0.034, 0.044, 0.05, 0.051, 0.047, 0.041, 0.031, 0.033, 0.033, 0.039, 0.041, 0.043],
+  diurnal: [
+    0.048, 0.047, 0.053, 0.051, 0.048, 0.046, 0.044, 0.043, 0.037, 0.032, 0.033, 0.029, 0.034, 0.044, 0.05,
+    0.051, 0.047, 0.041, 0.031, 0.033, 0.033, 0.039, 0.041, 0.043,
+  ],
   eventsPerYear: 122.6,
   durMedianH: 6,
   durP90H: 13,
@@ -87,6 +90,11 @@ export interface SiteState {
   histAccS: number;
   lastEmit: Record<string, number>; // código → epoch s del último reporte
   battery: Record<string, number>;
+  /** rotura de presa (solo simulacro): caudal por la brecha (m³/s) */
+  qbreach?: number;
+  /** caudal medio por la brecha cada 5 min (m³/s), el más reciente al final */
+  breachHist?: number[];
+  breachAcc?: number;
 }
 
 /** Forzamientos de simulacro (todos opcionales). */
@@ -100,6 +108,32 @@ export interface Forcing {
   starlinkDown?: boolean;
   latencyBoost?: number;
   valveOpen?: number; // fuerza caudal de la descarga de fondo (m³/s)
+  /** minutos desde el inicio de la brecha (rotura de presa); sin definir = presa íntegra */
+  breachMin?: number;
+}
+
+const G = 9.81;
+
+/**
+ * Parámetros de brecha por regresiones de Froehlich (2008), las usadas por USBR/FEMA para estudios
+ * de rotura: ancho medio B = 0,27·K₀·V^0,32·h^0,04 y tiempo de formación t_f = 63,2·√(V/(g·h²)).
+ * K₀ = 1,0 (falla por tubificación). V = volumen almacenado (m³), h = altura de la brecha (m).
+ */
+export function breachParams(p: SiteParams, volume = p.capacity) {
+  const hb = Math.max(5, p.cresta - p.fondo);
+  const widthM = 0.27 * Math.pow(Math.max(1, volume), 0.32) * Math.pow(hb, 0.04);
+  const formMin = (63.2 * Math.sqrt(Math.max(1, volume) / (G * hb * hb))) / 60;
+  // caudal pico de Froehlich (1995): Qp = 0,607·V^0,295·h^1,24 (referencia para validar el modelo)
+  const peakRef = 0.607 * Math.pow(Math.max(1, volume), 0.295) * Math.pow(hb, 1.24);
+  return { hb, widthM, formMin, peakRef };
+}
+
+/** Nivel del río (m) para un caudal: curva de descarga con crecimiento logarítmico en crecidas extremas. */
+export function stageOf(q: number, a = 0.45, b = 0.36) {
+  const Q1 = 60;
+  const x = Math.max(0, q);
+  if (x <= Q1) return a + b * Math.sqrt(x);
+  return a + b * Math.sqrt(Q1) + 1.1 * Math.log(x / Q1);
 }
 
 const Z90 = 1.2816;
@@ -112,7 +146,7 @@ const HIST_STEP_S = 300;
 const HIST_LEN = 84; // 7 h
 
 export function localHour(tMs: number): number {
-  return (((new Date(tMs).getUTCHours() - 5) % 24) + 24) % 24 + new Date(tMs).getUTCMinutes() / 60;
+  return ((((new Date(tMs).getUTCHours() - 5) % 24) + 24) % 24) + new Date(tMs).getUTCMinutes() / 60;
 }
 
 function runoffCoef(p: SiteParams): number {
@@ -127,7 +161,10 @@ export function pz2Target(p: SiteParams, cota: number) {
   return 95 + 5 * (cota - p.fondo);
 }
 export function riverStageBelowDam(q: number) {
-  return 0.35 + 0.42 * Math.pow(Math.max(0, q), 0.45);
+  const x = Math.max(0, q);
+  if (x <= 40) return 0.35 + 0.42 * Math.pow(x, 0.45);
+  // en crecidas extremas (rotura) el valle se ensancha: crecimiento logarítmico
+  return 0.35 + 0.42 * Math.pow(40, 0.45) + 1.6 * Math.log(x / 40);
 }
 
 /** Estado inicial en equilibrio a una cota dada. */
@@ -208,7 +245,10 @@ function stepRain(p: SiteParams, s: SiteState, rng: Rng, dtS: number, forcing?: 
     if (rng.chance(perMin * dtMin)) {
       const sp = Math.log(c.peakP90MmH / c.peakMedianMmH) / Z90;
       const sd = Math.log(c.durP90H / c.durMedianH) / Z90;
-      const peak = Math.min(c.maxHourMmH * 1.1, Math.exp(rng.gauss(Math.log(c.peakMedianMmH), sp)) * stormScale(c) * Math.sqrt(seasonal));
+      const peak = Math.min(
+        c.maxHourMmH * 1.1,
+        Math.exp(rng.gauss(Math.log(c.peakMedianMmH), sp)) * stormScale(c) * Math.sqrt(seasonal),
+      );
       // eventos intensos son cortos (convectivos); los largos son de baja intensidad
       const durCap = peak > c.peakP90MmH * 1.5 ? 6 * 60 : 60 * 60;
       const dur = Math.min(durCap, Math.max(30, Math.exp(rng.gauss(Math.log(c.durMedianH), sd)) * 60));
@@ -224,7 +264,8 @@ function stepRain(p: SiteParams, s: SiteState, rng: Rng, dtS: number, forcing?: 
     if (s.storm.remainingMin <= 0) s.storm = null;
   }
   // garúa de páramo
-  const drizzlePerMin = (DRIZZLE_SHARE * c.meanMmDay * seasonal) / (DRIZZLE_MMH * (DRIZZLE_MEAN_MIN / 60)) / 1440;
+  const drizzlePerMin =
+    (DRIZZLE_SHARE * c.meanMmDay * seasonal) / (DRIZZLE_MMH * (DRIZZLE_MEAN_MIN / 60)) / 1440;
   if (s.drizzleMin <= 0 && rng.chance(drizzlePerMin * dtMin)) s.drizzleMin = rng.range(30, 150);
   let drizzle = 0;
   if (s.drizzleMin > 0) {
@@ -236,12 +277,21 @@ function stepRain(p: SiteParams, s: SiteState, rng: Rng, dtS: number, forcing?: 
 
 /** Avanza un embalse `dtS` segundos (subpasos de ≤ 60 s). */
 export function stepSite(p: SiteParams, prev: SiteState, dtS: number, forcing?: Forcing): SiteState {
-  const s: SiteState = { ...prev, storm: prev.storm ? { ...prev.storm } : null, outHist: prev.outHist.slice(), lastEmit: { ...prev.lastEmit }, battery: { ...prev.battery } };
+  const s: SiteState = {
+    ...prev,
+    storm: prev.storm ? { ...prev.storm } : null,
+    outHist: prev.outHist.slice(),
+    lastEmit: { ...prev.lastEmit },
+    battery: { ...prev.battery },
+  };
   const rng = createRng(s.seed);
   const coefBase = runoffCoef(p);
   let remaining = dtS;
+  const breach = forcing?.breachMin !== undefined ? breachParams(p) : null;
+  let breachMin = forcing?.breachMin ?? 0;
   while (remaining > 0) {
-    const dt = Math.min(60, remaining);
+    // durante la rotura el caudal cambia muy rápido: subpasos de 10 s
+    const dt = Math.min(breach ? 10 : 60, remaining);
     remaining -= dt;
     s.t += dt * 1000;
 
@@ -263,8 +313,20 @@ export function stepSite(p: SiteParams, prev: SiteState, dtS: number, forcing?: 
     s.qspill = H > 0 ? p.coefDescarga * p.longitudVertedero * Math.pow(H, 1.5) : 0;
     const evap = ((2 / 1000) * areaAt(p.curve, s.cota)) / 86400;
 
-    // balance hídrico ΔV = (Qin − Qout − Qvert) · Δt
-    s.v = Math.max(0, s.v + (s.qin - s.qvalve - s.qspill - evap) * dt);
+    // rotura: la brecha se ensancha y profundiza durante t_f; vertedero de cresta ancha Q = 1,7·b·H^1,5
+    if (breach) {
+      breachMin += dt / 60;
+      const prog = Math.min(1, Math.max(0, breachMin / breach.formMin));
+      const width = Math.max(1.5, prog * breach.widthM);
+      const bottom = p.cresta - Math.max(0.08, prog) * breach.hb * 0.95;
+      const Hb = s.cota - bottom;
+      const q = Hb > 0 ? 1.7 * width * Math.pow(Hb, 1.5) : 0;
+      s.qbreach = Math.min(q, Math.max(0, s.v / dt + s.qin - s.qvalve - s.qspill));
+      s.breachAcc = (s.breachAcc ?? 0) + s.qbreach * dt;
+    }
+
+    // balance hídrico ΔV = (Qin − Qout − Qvert − Qbrecha) · Δt
+    s.v = Math.max(0, s.v + (s.qin - s.qvalve - s.qspill - (s.qbreach ?? 0) - evap) * dt);
     s.cota = cotaAt(p.curve, s.v);
 
     // geotecnia: presión de poro con retardo + deriva mínima
@@ -289,12 +351,18 @@ export function stepSite(p: SiteParams, prev: SiteState, dtS: number, forcing?: 
     s.stlLatency = Math.max(22, base + rng.gauss(0, 4) + spike + (forcing?.latencyBoost ?? 0));
 
     const qout = s.qvalve + s.qspill;
-    s.riverStage = riverStageBelowDam(qout);
+    s.riverStage = riverStageBelowDam(qout + (s.qbreach ?? 0));
     s.histAccS += dt;
     if (s.histAccS >= HIST_STEP_S) {
       s.histAccS -= HIST_STEP_S;
       s.outHist.push(qout);
       if (s.outHist.length > HIST_LEN) s.outHist.shift();
+      if (s.breachAcc !== undefined) {
+        const hist = (s.breachHist ??= Array.from({ length: s.outHist.length - 1 }, () => 0));
+        hist.push(s.breachAcc / HIST_STEP_S);
+        s.breachAcc = 0;
+        while (hist.length > HIST_LEN) hist.shift();
+      }
     }
   }
   if (forcing?.settleJump) s.settle += forcing.settleJump;
@@ -303,24 +371,53 @@ export function stepSite(p: SiteParams, prev: SiteState, dtS: number, forcing?: 
 }
 
 export function qoutOf(s: SiteState) {
-  return s.qvalve + s.qspill;
+  return s.qvalve + s.qspill + (s.qbreach ?? 0);
 }
 
 /** Qout del sitio hace `minutes` (historial cada 5 min). */
 export function qoutAgo(s: SiteState, minutes: number): number {
   const idx = s.outHist.length - 1 - Math.round(minutes / 5);
-  if (idx < 0) return s.outHist[0] ?? qoutOf(s);
+  if (idx < 0) return s.outHist[0] ?? s.qvalve + s.qspill;
   return s.outHist[idx];
+}
+
+const BREACH_LEAD_MIN = 10;
+
+/**
+ * Onda de rotura en un punto aguas abajo: hidrograma de la brecha desfasado al tiempo de llegada
+ * del frente, difundido (la onda se alarga con la distancia) y atenuado con la distancia
+ * (≈ 1/(1 + 0,03·km), del orden de las curvas de atenuación de USBR para valles de montaña).
+ */
+export function breachWaveAt(s: SiteState, arrivalMin: number, km: number): number {
+  const h = s.breachHist;
+  if (!h?.length) return 0;
+  // el frente (caudal ya significativo, ~10 min después de abrirse la brecha) llega en el tiempo de llegada
+  const center = Math.max(0, arrivalMin - BREACH_LEAD_MIN);
+  const spread = 5 + 0.1 * arrivalMin;
+  let sum = 0;
+  let n = 0;
+  for (let m = Math.max(0, center - spread); m <= center + spread; m += 2.5) {
+    const idx = h.length - 1 - Math.round(m / 5);
+    sum += idx >= 0 ? h[idx] : 0;
+    n++;
+  }
+  return n ? (sum / n) * (1 / (1 + 0.03 * Math.max(0, km))) : 0;
 }
 
 export interface DownstreamStation {
   code: string;
   baseFlow: number; // m³/s aportes laterales
   transit: Record<string, number>; // código de sitio → minutos de tránsito ordinario
+  /** llegada del frente de onda por rotura (min) y distancia por el cauce (km), por código de sitio */
+  arrival?: Record<string, number>;
+  km?: Record<string, number>;
 }
 
 /** Caudal y nivel del río en una estación aguas abajo (desfase = tiempo de tránsito). */
-export function downstreamStage(st: DownstreamStation, sites: Record<string, SiteState>): { q: number; stage: number } {
+export function downstreamStage(
+  st: DownstreamStation,
+  sites: Record<string, SiteState>,
+): { q: number; stage: number } {
   let q = st.baseFlow;
   let localRain = 0;
   let n = 0;
@@ -328,11 +425,13 @@ export function downstreamStage(st: DownstreamStation, sites: Record<string, Sit
     const s = sites[code];
     if (!s) continue;
     q += qoutAgo(s, minutes);
+    if (s.breachHist && st.arrival?.[code] !== undefined)
+      q += breachWaveAt(s, st.arrival[code], st.km?.[code] ?? 0);
     localRain += s.sFast / K_FAST_S;
     n++;
   }
   q += n ? (localRain / n) * 1.6 : 0;
-  return { q, stage: 0.45 + 0.36 * Math.sqrt(Math.max(0, q)) };
+  return { q, stage: stageOf(q) };
 }
 
 export function fillPct(p: SiteParams, s: SiteState) {

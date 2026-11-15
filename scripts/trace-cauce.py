@@ -10,7 +10,7 @@ Método hidrológico estándar:
   4. Simplifica (Douglas–Peucker) y suaviza (Chaikin) para un trazo limpio en el mapa.
 
 Uso:  python3 scripts/trace-cauce.py > /tmp/cauces.json
-Salida: {"CHQ": [[lng, lat], ...], "MLC": [...]} — se copia a config/sites.tungurahua.ts.
+Salida: {"CHQ": [[lng, lat], ...], "MLC": [...], "CQH": [...]} — se guarda en config/cauces.tungurahua.json.
 """
 import heapq
 import io
@@ -23,10 +23,12 @@ import numpy as np
 from PIL import Image
 
 Z = 13
-BBOX = (-78.875, -1.300, -78.575, -1.150)  # oeste, sur, este, norte
+BBOX = (-78.875, -1.400, -78.520, -1.150)  # oeste, sur, este, norte
 AMBATO = (-78.6168, -1.2491)
-DAMS = {"CHQ": (-78.81032, -1.20855), "MLC": (-78.82772, -1.19575)}
-LAKES = {"CHQ": (-78.806672, -1.205154), "MLC": (-78.826447, -1.190775)}
+DAMS = {"CHQ": (-78.81032, -1.20855), "MLC": (-78.82772, -1.19575), "CQH": (-78.76296, -1.35368)}
+# tramo urbano y aguas abajo de Ambato que se sigue después de pasar junto a la ciudad (km)
+PAST_AMBATO_KM = 6.5
+LAKES = {"CHQ": (-78.806672, -1.205154), "MLC": (-78.826447, -1.190775), "CQH": (-78.76256, -1.35712)}
 
 
 def tile_xy(lon, lat, z):
@@ -135,12 +137,15 @@ def main():
         path = [(r0, c0)]
         i = best[0] * w + best[1]
         closest = 1e9
+        past = None
         while i >= 0 and len(path) < 20000:
             r, c = divmod(i, w)
             path.append((r, c))
             closest = min(closest, math.hypot(r - amb[0], c - amb[1]))
-            # se corta al pasar junto a Ambato (≈1,1 km), antes de que el río siga hacia el noreste
-            if closest * 19 < 1100:
+            # tras pasar junto a Ambato (≈1,1 km) se sigue el río por la ciudad y hacia el noreste
+            if past is None and closest * 19 < 1100:
+                past = len(path)
+            if past is not None and (len(path) - past) * 19 * 1.2 > PAST_AMBATO_KM * 1000:
                 break
             i = rec[i]
         ll = [pix_to_lonlat(c + 0.5, r + 0.5, x0, y0, Z) for r, c in path]

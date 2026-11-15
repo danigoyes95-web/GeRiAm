@@ -5,6 +5,7 @@ import { useOrgLive } from "@/lib/data/live";
 export const SCENARIO_LABEL: Record<string, string> = {
   tormenta: "Tormenta extrema en páramo",
   estructural: "Anomalía estructural en presa",
+  rotura: "Rotura de presa",
   comunicacion: "Pérdida de comunicación (Starlink)",
 };
 

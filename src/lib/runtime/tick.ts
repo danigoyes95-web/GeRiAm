@@ -23,7 +23,7 @@ import {
   type SiteRow,
 } from "./repo";
 import { applyEvaluation, runEscalations } from "./alerts";
-import { stepDrill } from "./drill";
+import { drillSiteIds, stepDrill } from "./drill";
 
 const STEP_BACKFILL_S = 900;
 const MAX_CATCHUP_MS = 24 * 3600 * 1000;
@@ -100,8 +100,9 @@ async function evaluateSite(sb: Admin, b: OrgBundle, site: SiteRow, now: number,
 
 export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Omit<TickSummary, "orgs" | "ms">> {
   const b = await loadOrgBundle(sb, orgId);
-  const drillSite = b.drill?.site_id ?? null;
-  const sites = b.sites.filter((s) => s.data_source === "simulado" && s.id !== drillSite);
+  // los embalses del simulacro en curso los avanza el simulacro (se restauran al finalizar)
+  const drillSites = new Set(drillSiteIds(b.drill));
+  const sites = b.sites.filter((s) => s.data_source === "simulado" && !drillSites.has(s.id));
   const states: Record<string, SiteState> = {};
   for (const s of b.sites) states[s.code] = stateFor(b, s, now - 60_000);
 
@@ -176,7 +177,7 @@ export async function tickOrg(sb: Admin, orgId: string, now: number): Promise<Om
 
   // Alertas
   let evaluated = 0;
-  for (const site of b.sites.filter((s) => s.id !== drillSite)) evaluated += await evaluateSite(sb, b, site, now, overrides);
+  for (const site of b.sites.filter((s) => !drillSites.has(s.id))) evaluated += await evaluateSite(sb, b, site, now, overrides);
   const openAll = await sb.from("alerts").select("*").eq("organization_id", b.org.id).neq("status", "resuelta").is("drill_run_id", null);
   const escalations = await runEscalations(sb, b, openAll.data ?? [], { now });
 

@@ -83,11 +83,16 @@ export function stationFor(b: OrgBundle, sensor: SensorRow): DownstreamStation |
   if (!point) return undefined;
   const base = point.kind === "ciudad" ? 3.2 : (point.poblacion_expuesta ?? 0) > 1000 ? 2.0 : 1.2;
   const transit: Record<string, number> = {};
+  const arrival: Record<string, number> = {};
+  const km: Record<string, number> = {};
   for (const r of b.routes.filter((x) => x.point_id === point.id)) {
     const site = b.sites.find((s) => s.id === r.site_id);
-    if (site) transit[site.code] = r.tiempo_transito_normal_min;
+    if (!site) continue;
+    transit[site.code] = r.tiempo_transito_normal_min;
+    arrival[site.code] = r.tiempo_llegada_min;
+    km[site.code] = Number(r.distancia_km ?? 0);
   }
-  return { code: point.name, baseFlow: base, transit };
+  return { code: point.name, baseFlow: base, transit, arrival, km };
 }
 
 export function simSensorsFor(b: OrgBundle, site: SiteRow): SimSensor[] {
