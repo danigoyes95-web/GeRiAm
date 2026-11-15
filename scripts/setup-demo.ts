@@ -9,6 +9,7 @@
  * Requiere NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY.
  */
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import * as webpush from "web-push";
 import type { DB, GeriamSchema } from "../src/lib/supabase/config";
@@ -33,7 +34,10 @@ import { insertReadings, readingRows, saveStates } from "../src/lib/runtime/tick
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const schema = (process.env.NEXT_PUBLIC_SUPABASE_SCHEMA ?? "geriam") as GeriamSchema;
-const sb = createClient<DB, GeriamSchema>(url, key, { db: { schema }, auth: { persistSession: false, autoRefreshToken: false } });
+const sb = createClient<DB, GeriamSchema>(url, key, {
+  db: { schema },
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => a.replace(/^--/, "").split("=")));
 const only = args.only ? new Set(String(args.only).split(",")) : null;
@@ -45,6 +49,9 @@ const pointsOnly = !!args.points;
 /** --codes=A,B: el backfill solo genera lecturas de esos sensores y no altera el estado vivo. */
 const codeFilter = args.codes ? new Set(String(args.codes).split(",")) : null;
 
+/** Solo se registra el clip de demostración si el archivo existe en public/ (sin archivo, la cámara muestra "sin señal"). */
+const clipIfPresent = (clip?: string | null) => (clip && existsSync(`public${clip}`) ? clip : null);
+
 function ok<T>(r: { data: T; error: { message: string } | null }, what: string): NonNullable<T> {
   if (r.error) throw new Error(`${what}: ${r.error.message}`);
   return r.data as NonNullable<T>;
@@ -55,21 +62,54 @@ async function seed() {
     await sb
       .from("organizations")
       .upsert(
-        { slug: ORGANIZATION.slug, name: ORGANIZATION.name, short_name: ORGANIZATION.short_name, timezone: ORGANIZATION.timezone, map_center: ORGANIZATION.map_center, branding: ORGANIZATION.branding },
+        {
+          slug: ORGANIZATION.slug,
+          name: ORGANIZATION.name,
+          short_name: ORGANIZATION.short_name,
+          timezone: ORGANIZATION.timezone,
+          map_center: ORGANIZATION.map_center,
+          branding: ORGANIZATION.branding,
+        },
         { onConflict: "slug" },
       )
       .select("*")
       .single(),
     "org",
   );
-  await sb.from("organizations").update({ settings: { ...((org.settings ?? {}) as object), ...ORGANIZATION.settings } }).eq("id", org.id);
-  const zones = ok(await sb.from("zones").upsert(ZONES.map((z) => ({ ...z, organization_id: org.id })), { onConflict: "organization_id,code" }).select("*"), "zones");
+  await sb
+    .from("organizations")
+    .update({ settings: { ...((org.settings ?? {}) as object), ...ORGANIZATION.settings } })
+    .eq("id", org.id);
+  const zones = ok(
+    await sb
+      .from("zones")
+      .upsert(
+        ZONES.map((z) => ({ ...z, organization_id: org.id })),
+        { onConflict: "organization_id,code" },
+      )
+      .select("*"),
+    "zones",
+  );
   const zoneId = (code: string) => zones.find((z) => z.code === code)?.id ?? null;
 
   const points: Record<string, string> = {};
   for (const d of DOWNSTREAM_POINTS) {
-    const ex = await sb.from("downstream_points").select("id").eq("organization_id", org.id).eq("name", d.name).maybeSingle();
-    const row = { organization_id: org.id, zone_id: zoneId(d.zone), name: d.name, kind: d.kind, lat: d.lat, lng: d.lng, verificado: d.verificado, poblacion_expuesta: d.poblacion };
+    const ex = await sb
+      .from("downstream_points")
+      .select("id")
+      .eq("organization_id", org.id)
+      .eq("name", d.name)
+      .maybeSingle();
+    const row = {
+      organization_id: org.id,
+      zone_id: zoneId(d.zone),
+      name: d.name,
+      kind: d.kind,
+      lat: d.lat,
+      lng: d.lng,
+      verificado: d.verificado,
+      poblacion_expuesta: d.poblacion,
+    };
     const r = ex.data
       ? ok(await sb.from("downstream_points").update(row).eq("id", ex.data.id).select("id").single(), "point")
       : ok(await sb.from("downstream_points").insert(row).select("id").single(), "point");
@@ -78,13 +118,26 @@ async function seed() {
 
   for (const s of SITES.filter((x) => !siteFilter || x.code === siteFilter)) {
     if (pointsOnly) {
-      const site = ok(await sb.from("sites").select("id").eq("organization_id", org.id).eq("code", s.code).single(), "site");
+      const site = ok(
+        await sb.from("sites").select("id").eq("organization_id", org.id).eq("code", s.code).single(),
+        "site",
+      );
       for (const d of s.downstream) {
         ok(
-          await sb.from("site_downstream").upsert(
-            { site_id: site.id, point_id: points[d.point], organization_id: org.id, distancia_km: d.distancia_km, tiempo_llegada_min: d.llegada_min, tiempo_transito_normal_min: d.transito_min, fuente: d.fuente },
-            { onConflict: "site_id,point_id" },
-          ),
+          await sb
+            .from("site_downstream")
+            .upsert(
+              {
+                site_id: site.id,
+                point_id: points[d.point],
+                organization_id: org.id,
+                distancia_km: d.distancia_km,
+                tiempo_llegada_min: d.llegada_min,
+                tiempo_transito_normal_min: d.transito_min,
+                fuente: d.fuente,
+              },
+              { onConflict: "site_id,point_id" },
+            ),
           "route",
         );
       }
@@ -121,7 +174,10 @@ async function seed() {
             .single(),
           `sensor ${se.code}`,
         );
-        await sb.from("downstream_points").update({ nivel_rio_sensor_id: r.id }).eq("id", points[se.downstreamPoint!]);
+        await sb
+          .from("downstream_points")
+          .update({ nivel_rio_sensor_id: r.id })
+          .eq("id", points[se.downstreamPoint!]);
       }
       continue;
     }
@@ -151,7 +207,13 @@ async function seed() {
             cota_vertedero: s.cota_vertedero,
             longitud_vertedero: s.longitud_vertedero,
             coeficiente_descarga: s.coeficiente_descarga,
-            curva_area_volumen: buildCurve(s.cota_fondo, s.cota_namo, s.cota_cresta, s.capacity_m3, s.curva_m) as never,
+            curva_area_volumen: buildCurve(
+              s.cota_fondo,
+              s.cota_namo,
+              s.cota_cresta,
+              s.capacity_m3,
+              s.curva_m,
+            ) as never,
             caudal_entrada_base: s.caudal_entrada_base,
             caudal_salida_nominal: s.caudal_salida_nominal,
             area_cuenca_km2: s.area_cuenca_km2,
@@ -181,7 +243,11 @@ async function seed() {
             coverage_radius_m: g.radius_m,
             status: "online",
             last_seen_at: new Date().toISOString(),
-            metadata: { modelo: "RAK7289 V2 (referencial)", backhaul: "Starlink Standard", antena: "Omnidireccional 5,8 dBi" } as never,
+            metadata: {
+              modelo: "RAK7289 V2 (referencial)",
+              backhaul: "Starlink Standard",
+              antena: "Omnidireccional 5,8 dBi",
+            } as never,
           },
           { onConflict: "eui" },
         )
@@ -191,17 +257,39 @@ async function seed() {
     );
     ok(
       await sb.from("cameras").upsert(
-        s.cameras.map((c) => ({ organization_id: org.id, site_id: site.id, code: c.code, name: c.name, kind: c.kind, demo_clip: c.clip, lat: c.lat, lng: c.lng, bearing: c.bearing, position_label: c.position, status: "online" })),
+        s.cameras.map((c) => ({
+          organization_id: org.id,
+          site_id: site.id,
+          code: c.code,
+          name: c.name,
+          kind: c.kind,
+          demo_clip: clipIfPresent(c.clip),
+          lat: c.lat,
+          lng: c.lng,
+          bearing: c.bearing,
+          position_label: c.position,
+          status: "online",
+        })),
         { onConflict: "organization_id,code" },
       ),
       "cameras",
     );
     for (const d of s.downstream) {
       ok(
-        await sb.from("site_downstream").upsert(
-          { site_id: site.id, point_id: points[d.point], organization_id: org.id, distancia_km: d.distancia_km, tiempo_llegada_min: d.llegada_min, tiempo_transito_normal_min: d.transito_min, fuente: d.fuente },
-          { onConflict: "site_id,point_id" },
-        ),
+        await sb
+          .from("site_downstream")
+          .upsert(
+            {
+              site_id: site.id,
+              point_id: points[d.point],
+              organization_id: org.id,
+              distancia_km: d.distancia_km,
+              tiempo_llegada_min: d.llegada_min,
+              tiempo_transito_normal_min: d.transito_min,
+              fuente: d.fuente,
+            },
+            { onConflict: "site_id,point_id" },
+          ),
         "route",
       );
     }
@@ -217,7 +305,9 @@ async function seed() {
               code: se.code,
               name: se.name,
               type: se.type,
-              dev_eui: se.downstreamPoint ? null : `70B3D57ED00${{ CHQ: "1", MLC: "2", CQH: "3" }[s.code as "CHQ" | "MLC" | "CQH"] ?? "9"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`,
+              dev_eui: se.downstreamPoint
+                ? null
+                : `70B3D57ED00${{ CHQ: "1", MLC: "2", CQH: "3" }[s.code as "CHQ" | "MLC" | "CQH"] ?? "9"}${(idx + 1).toString(16).toUpperCase().padStart(4, "0")}`,
               unit: se.unit,
               decimals: se.decimals,
               lat: se.lat,
@@ -230,7 +320,10 @@ async function seed() {
               thresholds: (se.thresholds ?? {}) as never,
               status: "activo",
               data_source: "simulado",
-              metadata: { enlace: se.downstreamPoint ? "celular/API" : se.gateway ? "cableado al gateway" : "LoRaWAN", downstream_point: se.downstreamPoint ?? null } as never,
+              metadata: {
+                enlace: se.downstreamPoint ? "celular/API" : se.gateway ? "cableado al gateway" : "LoRaWAN",
+                downstream_point: se.downstreamPoint ?? null,
+              } as never,
             },
             { onConflict: "organization_id,code" },
           )
@@ -238,23 +331,65 @@ async function seed() {
           .single(),
         `sensor ${se.code}`,
       );
-      if (se.downstreamPoint) await sb.from("downstream_points").update({ nivel_rio_sensor_id: r.id }).eq("id", points[se.downstreamPoint]);
+      if (se.downstreamPoint)
+        await sb
+          .from("downstream_points")
+          .update({ nivel_rio_sensor_id: r.id })
+          .eq("id", points[se.downstreamPoint]);
     }
     ok(
       await sb.from("alert_rules").upsert(
-        siteRules(s).map((r) => ({ organization_id: org.id, site_id: site.id, code: r.code, name: r.name, kind: r.kind, level: r.level, params: r.params as never, cooldown_min: r.cooldown_min })),
+        siteRules(s).map((r) => ({
+          organization_id: org.id,
+          site_id: site.id,
+          code: r.code,
+          name: r.name,
+          kind: r.kind,
+          level: r.level,
+          params: r.params as never,
+          cooldown_min: r.cooldown_min,
+        })),
         { onConflict: "organization_id,code" },
       ),
       "rules",
     );
   }
 
-  const existing = ok(await sb.from("protocols").select("level, role, title").eq("organization_id", org.id), "protocols");
-  const missing = PROTOCOLS.map((p, i) => ({ ...p, sort: i })).filter((p) => !existing.some((e) => e.level === p.level && e.role === p.role && e.title === p.title));
-  if (missing.length) ok(await sb.from("protocols").insert(missing.map((p) => ({ organization_id: org.id, level: p.level, role: p.role, phase: p.phase, title: p.title, actions: p.actions as never, sort: p.sort }))), "protocols");
+  const existing = ok(
+    await sb.from("protocols").select("level, role, title").eq("organization_id", org.id),
+    "protocols",
+  );
+  const missing = PROTOCOLS.map((p, i) => ({ ...p, sort: i })).filter(
+    (p) => !existing.some((e) => e.level === p.level && e.role === p.role && e.title === p.title),
+  );
+  if (missing.length)
+    ok(
+      await sb
+        .from("protocols")
+        .insert(
+          missing.map((p) => ({
+            organization_id: org.id,
+            level: p.level,
+            role: p.role,
+            phase: p.phase,
+            title: p.title,
+            actions: p.actions as never,
+            sort: p.sort,
+          })),
+        ),
+      "protocols",
+    );
   ok(
     await sb.from("escalation_policies").upsert(
-      ESCALATION.map((e) => ({ organization_id: org.id, level: e.level, step: e.step, after_min: e.after_min, roles: [...e.roles], channels: [...e.channels], description: e.description })),
+      ESCALATION.map((e) => ({
+        organization_id: org.id,
+        level: e.level,
+        step: e.step,
+        after_min: e.after_min,
+        roles: [...e.roles],
+        channels: [...e.channels],
+        description: e.description,
+      })),
       { onConflict: "organization_id,level,step" },
     ),
     "escalation",
@@ -263,7 +398,9 @@ async function seed() {
     console.log(`✓ puntos de control: ${DOWNSTREAM_POINTS.length}`);
     return org.id;
   }
-  console.log(`✓ semilla: ${SITES.length} embalses, ${SITES.reduce((a, s) => a + s.sensors.length, 0)} sensores, ${DOWNSTREAM_POINTS.length} puntos aguas abajo`);
+  console.log(
+    `✓ semilla: ${SITES.length} embalses, ${SITES.reduce((a, s) => a + s.sensors.length, 0)} sensores, ${DOWNSTREAM_POINTS.length} puntos aguas abajo`,
+  );
   return org.id;
 }
 
@@ -273,7 +410,12 @@ async function users(orgId: string) {
   for (const u of DEMO_USERS) {
     let user = list.data?.users.find((x) => x.email === u.email);
     if (!user) {
-      const r = await sb.auth.admin.createUser({ email: u.email, password: DEMO_PASSWORD, email_confirm: true, app_metadata: { geriam_demo: true } });
+      const r = await sb.auth.admin.createUser({
+        email: u.email,
+        password: DEMO_PASSWORD,
+        email_confirm: true,
+        app_metadata: { geriam_demo: true },
+      });
       if (r.error) throw new Error(`usuario ${u.email}: ${r.error.message}`);
       user = r.data.user;
     }
@@ -302,15 +444,24 @@ async function users(orgId: string) {
 async function secrets(orgId: string) {
   const current = ok(await sb.from("app_secrets").select("name"), "secrets").map((x) => x.name);
   const rows: { name: string; value: string }[] = [];
-  if (!current.includes("cron_secret")) rows.push({ name: "cron_secret", value: randomBytes(24).toString("base64url") });
-  if (!current.includes("functions_url")) rows.push({ name: "functions_url", value: `${url.replace(/\/$/, "")}/functions/v1` });
+  if (!current.includes("cron_secret"))
+    rows.push({ name: "cron_secret", value: randomBytes(24).toString("base64url") });
+  if (!current.includes("functions_url"))
+    rows.push({ name: "functions_url", value: `${url.replace(/\/$/, "")}/functions/v1` });
   const appUrl = String(args["app-url"] ?? process.env.GERIAM_APP_URL ?? "https://geriam.vercel.app");
   if (!current.includes("app_url")) rows.push({ name: "app_url", value: appUrl });
-  else if (args["app-url"]) ok(await sb.from("app_secrets").update({ value: appUrl }).eq("name", "app_url").select("name"), "app_url");
+  else if (args["app-url"])
+    ok(
+      await sb.from("app_secrets").update({ value: appUrl }).eq("name", "app_url").select("name"),
+      "app_url",
+    );
   let vapidPublic: string | null = null;
   if (!current.includes("vapid_private_key")) {
     const v = webpush.generateVAPIDKeys();
-    rows.push({ name: "vapid_public_key", value: v.publicKey }, { name: "vapid_private_key", value: v.privateKey });
+    rows.push(
+      { name: "vapid_public_key", value: v.publicKey },
+      { name: "vapid_private_key", value: v.privateKey },
+    );
     vapidPublic = v.publicKey;
   }
   if (rows.length) ok(await sb.from("app_secrets").insert(rows), "secrets insert");
@@ -319,16 +470,27 @@ async function secrets(orgId: string) {
     vapidPublic = r.data?.value ?? null;
   }
   const org = ok(await sb.from("organizations").select("settings").eq("id", orgId).single(), "org");
-  await sb.from("organizations").update({ settings: { ...((org.settings ?? {}) as object), vapid_public_key: vapidPublic } }).eq("id", orgId);
-  console.log(`✓ secretos: ${rows.length ? rows.map((r) => r.name).join(", ") : "ya existían"} (clave pública VAPID publicada en settings)`);
+  await sb
+    .from("organizations")
+    .update({ settings: { ...((org.settings ?? {}) as object), vapid_public_key: vapidPublic } })
+    .eq("id", orgId);
+  console.log(
+    `✓ secretos: ${rows.length ? rows.map((r) => r.name).join(", ") : "ya existían"} (clave pública VAPID publicada en settings)`,
+  );
 }
 
 async function backfill(orgId: string, days: number) {
   const b = await loadOrgBundle(sb, orgId);
   // con --codes se simulan todos los embalses (las estaciones del río dependen de todos) pero solo se emiten esos sensores
   const targets = b.sites.filter((s) => codeFilter || !siteFilter || s.code === siteFilter);
-  const targetSensors = b.sensors.filter((x) => (codeFilter ? codeFilter.has(x.code) : targets.some((s) => s.id === x.site_id))).map((x) => x.id);
-  const count = await sb.from("readings").select("sensor_id", { count: "exact", head: true }).eq("organization_id", orgId).in("sensor_id", targetSensors);
+  const targetSensors = b.sensors
+    .filter((x) => (codeFilter ? codeFilter.has(x.code) : targets.some((s) => s.id === x.site_id)))
+    .map((x) => x.id);
+  const count = await sb
+    .from("readings")
+    .select("sensor_id", { count: "exact", head: true })
+    .eq("organization_id", orgId)
+    .in("sensor_id", targetSensors);
   if ((count.count ?? 0) > 0 && !args.force) {
     console.log(`• backfill omitido: ya hay ${count.count} lecturas (use --force)`);
     return;
@@ -339,14 +501,23 @@ async function backfill(orgId: string, days: number) {
   const states: Record<string, SiteState> = {};
   for (const s of targets) {
     const p = paramsFor(s);
-    states[s.code] = initialState(p, p.namo + (offsets[s.code] ?? -0.8), start, hashSeed(`${s.code}-backfill`));
+    states[s.code] = initialState(
+      p,
+      p.namo + (offsets[s.code] ?? -0.8),
+      start,
+      hashSeed(`${s.code}-backfill`),
+    );
   }
   let total = 0;
   let buffer: ReturnType<typeof readingRows> = [];
   for (let t = start + 900_000; t <= end; t += 900_000) {
     for (const s of targets) states[s.code] = stepSite(paramsFor(s), states[s.code], 900);
     for (const s of targets) {
-      const st = { ...states[s.code], lastEmit: { ...states[s.code].lastEmit }, battery: { ...states[s.code].battery } };
+      const st = {
+        ...states[s.code],
+        lastEmit: { ...states[s.code].lastEmit },
+        battery: { ...states[s.code].battery },
+      };
       const sensors = simSensorsFor(b, s).filter((x) => !codeFilter || codeFilter.has(x.code));
       if (!sensors.length) continue;
       const readings = emitReadings(st, sensors, states, { mode: "backfill", stepS: 900 });
@@ -370,7 +541,8 @@ async function main() {
   if (!url || !key) throw new Error("Faltan NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY");
   let orgId: string;
   if (run("seed")) orgId = await seed();
-  else orgId = ok(await sb.from("organizations").select("id").eq("slug", ORGANIZATION.slug).single(), "org").id;
+  else
+    orgId = ok(await sb.from("organizations").select("id").eq("slug", ORGANIZATION.slug).single(), "org").id;
   if (run("users")) await users(orgId);
   if (run("secrets")) await secrets(orgId);
   if (run("backfill")) await backfill(orgId, Number(args.days ?? 30));

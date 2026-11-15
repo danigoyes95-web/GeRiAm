@@ -17,7 +17,7 @@ const sql = fs
 const typeMap: Record<string, string> = {
   uuid: "string",
   text: "string",
-  "timestamptz": "string",
+  timestamptz: "string",
   "double precision": "number",
   numeric: "number",
   integer: "number",
@@ -44,7 +44,10 @@ while ((m = re.exec(sql))) {
   for (const raw of body.split("\n")) {
     const line = raw.replace(/--.*$/, "").trim().replace(/,$/, "");
     if (!line || /^(primary key|unique|check|constraint)/i.test(line)) continue;
-    const cm = /^(\w+)\s+(timestamptz|double precision|uuid\[\]|text\[\]|uuid|text|numeric|integer|smallint|bigint|boolean|jsonb)(.*)$/i.exec(line);
+    const cm =
+      /^(\w+)\s+(timestamptz|double precision|uuid\[\]|text\[\]|uuid|text|numeric|integer|smallint|bigint|boolean|jsonb)(.*)$/i.exec(
+        line,
+      );
     if (!cm) continue;
     const [, col, type, rest] = cm;
     const isPk = /primary key/i.test(rest);
@@ -57,17 +60,24 @@ while ((m = re.exec(sql))) {
 
 const lines: string[] = [];
 lines.push("// ⚠ Generado por scripts/gen-types.ts — no editar a mano.");
-lines.push("export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];\n");
+lines.push(
+  "export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];\n",
+);
 lines.push("export interface Database {");
 lines.push("  geriam: {");
 lines.push("    Tables: {");
 for (const [t, cols] of Object.entries(tables)) {
   const row = cols.map((c) => `          ${c.name}: ${c.ts}${c.nullable ? " | null" : ""};`).join("\n");
   const ins = cols
-    .map((c) => `          ${c.name}${c.nullable || c.hasDefault ? "?" : ""}: ${c.ts}${c.nullable ? " | null" : ""};`)
+    .map(
+      (c) =>
+        `          ${c.name}${c.nullable || c.hasDefault ? "?" : ""}: ${c.ts}${c.nullable ? " | null" : ""};`,
+    )
     .join("\n");
   const upd = cols.map((c) => `          ${c.name}?: ${c.ts}${c.nullable ? " | null" : ""};`).join("\n");
-  lines.push(`      ${t}: {\n        Row: {\n${row}\n        };\n        Insert: {\n${ins}\n        };\n        Update: {\n${upd}\n        };\n        Relationships: [];\n      };`);
+  lines.push(
+    `      ${t}: {\n        Row: {\n${row}\n        };\n        Insert: {\n${ins}\n        };\n        Update: {\n${upd}\n        };\n        Relationships: [];\n      };`,
+  );
 }
 lines.push("    };");
 lines.push("    Views: { [_ in never]: never };");
