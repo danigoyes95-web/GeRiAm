@@ -108,6 +108,13 @@ function siteMarkerHtml(s: BasinMapSite, selected: boolean) {
 /** El mapa sigue montado y con estilo (tras map.remove() el estilo queda indefinido). */
 const alive = (map: MapboxMap) => !!(map as unknown as { style?: unknown }).style;
 
+/** Frentes de crecida simultáneos (rotura de varias presas). */
+const FLOOD_SLOTS = 3;
+const floodIds = (i: number) =>
+  i
+    ? { src: `flood-${i}`, glow: `flood-glow-${i}`, line: `flood-line-${i}` }
+    : { src: "flood", glow: "flood-glow", line: "flood-line" };
+
 export function BasinMap({
   center,
   sites,
@@ -294,29 +301,32 @@ export function BasinMap({
               map.getLayer("cauce-glow") ? "cauce-glow" : undefined,
             );
           // Simulacro: frente de crecida (line-gradient requiere lineMetrics) y pulso en la presa
-          if (!map.getSource("flood"))
-            map.addSource("flood", { type: "geojson", data: empty, lineMetrics: true });
-          if (!map.getLayer("flood-glow"))
-            map.addLayer({
-              id: "flood-glow",
-              type: "line",
-              source: "flood",
-              layout: { "line-cap": "round", "line-join": "round" },
-              paint: {
-                "line-width": 22,
-                "line-blur": 14,
-                "line-opacity": 0.55,
-                "line-gradient": "rgba(0,0,0,0)",
-              },
-            });
-          if (!map.getLayer("flood-line"))
-            map.addLayer({
-              id: "flood-line",
-              type: "line",
-              source: "flood",
-              layout: { "line-cap": "round", "line-join": "round" },
-              paint: { "line-width": 6, "line-gradient": "rgba(0,0,0,0)" },
-            });
+          for (let i = 0; i < FLOOD_SLOTS; i++) {
+            const f = floodIds(i);
+            if (!map.getSource(f.src))
+              map.addSource(f.src, { type: "geojson", data: empty, lineMetrics: true });
+            if (!map.getLayer(f.glow))
+              map.addLayer({
+                id: f.glow,
+                type: "line",
+                source: f.src,
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: {
+                  "line-width": 22,
+                  "line-blur": 14,
+                  "line-opacity": 0.55,
+                  "line-gradient": "rgba(0,0,0,0)",
+                },
+              });
+            if (!map.getLayer(f.line))
+              map.addLayer({
+                id: f.line,
+                type: "line",
+                source: f.src,
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: { "line-width": 6, "line-gradient": "rgba(0,0,0,0)" },
+              });
+          }
           if (!map.getSource("scene-pulse")) map.addSource("scene-pulse", { type: "geojson", data: empty });
           if (!map.getLayer("scene-pulse"))
             map.addLayer({
@@ -333,6 +343,10 @@ export function BasinMap({
                 "circle-pitch-alignment": "map",
               },
             });
+          // con muchos puntos de control, sus etiquetas se muestran solo al acercarse (o al pasar el cursor)
+          const far = () => map.getContainer().classList.toggle("geriam-far", map.getZoom() < 12.3);
+          far();
+          map.on("zoomend", far);
           setReady(true);
           setDataNonce((n) => n + 1);
         } catch (e) {
@@ -512,29 +526,40 @@ export function BasinMap({
   const sceneSite = scene?.siteId ?? null;
   const floodOn = scene?.flood !== null && scene?.flood !== undefined;
 
-  // cauce del sitio del simulacro y punto de pulso
+  // cauces de las presas del simulacro (un frente por presa) y pulso en cada presa
+  const floodSites = scene?.floods.map((f) => f.siteId).join(",") ?? "";
+  const pulseSites = (scene?.brokenSiteIds.length ? scene.brokenSiteIds : sceneSite ? [sceneSite] : []).join(
+    ",",
+  );
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !alive(map) || !map.getSource("flood")) return;
-    const site = sites.find((x) => x.site.id === sceneSite)?.site;
-    const line = site?.cauce_geojson as unknown as GeoJSON.LineString | undefined;
-    (map.getSource("flood") as GeoJSONSource).setData({
-      type: "FeatureCollection",
-      features: line && floodOn ? [{ type: "Feature", properties: {}, geometry: line }] : [],
-    });
-    (map.getSource("scene-pulse") as GeoJSONSource).setData({
-      type: "FeatureCollection",
-      features: site
+    const ids = floodSites ? floodSites.split(",") : [];
+    for (let i = 0; i < FLOOD_SLOTS; i++) {
+      const site = sites.find((x) => x.site.id === ids[i])?.site;
+      const line = site?.cauce_geojson as unknown as GeoJSON.LineString | undefined;
+      (map.getSource(floodIds(i).src) as GeoJSONSource | undefined)?.setData({
+        type: "FeatureCollection",
+        features: line ? [{ type: "Feature", properties: {}, geometry: line }] : [],
+      });
+    }
+    const pulse = (pulseSites ? pulseSites.split(",") : []).flatMap((id) => {
+      const site = sites.find((x) => x.site.id === id)?.site;
+      return site
         ? [
             {
-              type: "Feature",
+              type: "Feature" as const,
               properties: {},
-              geometry: { type: "Point", coordinates: [site.dam_lng ?? site.lng, site.dam_lat ?? site.lat] },
+              geometry: {
+                type: "Point" as const,
+                coordinates: [site.dam_lng ?? site.lng, site.dam_lat ?? site.lat],
+              },
             },
           ]
-        : [],
+        : [];
     });
-  }, [ready, sceneSite, floodOn, sites]);
+    (map.getSource("scene-pulse") as GeoJSONSource).setData({ type: "FeatureCollection", features: pulse });
+  }, [ready, floodSites, pulseSites, sites]);
 
   // zonas inundables SNGR: aparecen cuando sale la crecida
   useEffect(() => {
@@ -610,11 +635,13 @@ export function BasinMap({
       map.setPaintProperty("scene-pulse", "circle-opacity", (1 - p) * 0.18);
       map.setPaintProperty("scene-pulse", "circle-color", col);
       map.setPaintProperty("scene-pulse", "circle-stroke-color", col);
-      if (sc.flood !== null && map.getLayer("flood-line")) {
-        const f = Math.min(0.995, Math.max(0.02, sc.flood));
-        const shimmer = 0.5 + 0.5 * Math.sin(ms / 220);
-        const head = `rgba(255,${Math.round(220 + 35 * shimmer)},${Math.round(200 + 55 * shimmer)},1)`;
-        const body = sc.level === "roja" ? "rgba(239,68,68,0.95)" : "rgba(251,146,60,0.95)";
+      const shimmer = 0.5 + 0.5 * Math.sin(ms / 220);
+      const head = `rgba(255,${Math.round(220 + 35 * shimmer)},${Math.round(200 + 55 * shimmer)},1)`;
+      const body = sc.level === "roja" ? "rgba(239,68,68,0.95)" : "rgba(251,146,60,0.95)";
+      sc.floods.slice(0, FLOOD_SLOTS).forEach((fl, i) => {
+        const ids = floodIds(i);
+        if (!map.getLayer(ids.line)) return;
+        const f = Math.min(0.995, Math.max(0.02, fl.fraction));
         const grad = [
           "interpolate",
           ["linear"],
@@ -630,10 +657,10 @@ export function BasinMap({
           1,
           "rgba(0,0,0,0)",
         ];
-        map.setPaintProperty("flood-line", "line-gradient", grad as never);
-        map.setPaintProperty("flood-glow", "line-gradient", grad as never);
-        map.setPaintProperty("flood-glow", "line-opacity", 0.35 + 0.3 * shimmer);
-      }
+        map.setPaintProperty(ids.line, "line-gradient", grad as never);
+        map.setPaintProperty(ids.glow, "line-gradient", grad as never);
+        map.setPaintProperty(ids.glow, "line-opacity", 0.35 + 0.3 * shimmer);
+      });
     };
     raf = requestAnimationFrame(tick);
     return () => {
@@ -655,7 +682,19 @@ export function BasinMap({
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
       const cur = etaMarkersRef.current;
-      const etas = sceneRef.current?.etas ?? [];
+      // con muchos puntos: el último alcanzado, los dos siguientes y Ambato (sin amontonar etiquetas)
+      const all = sceneRef.current?.etas ?? [];
+      const etas =
+        all.length <= 4
+          ? all
+          : (() => {
+              const next = all.filter((x) => x.remainingMin > 0).slice(0, 2);
+              const hit = all.filter((x) => x.remainingMin <= 0 && x.remainingMin > -25).slice(-1);
+              return all.filter(
+                (e) =>
+                  next.includes(e) || hit.includes(e) || (/ambato/i.test(e.name) && e.remainingMin > -25),
+              );
+            })();
       for (const [name, m] of cur) {
         if (etas.some((e) => e.name === name)) continue;
         m.marker.remove();

@@ -43,6 +43,7 @@ const RANGE_MS: Record<Range, number> = { "24h": 864e5, "7d": 7 * 864e5, "30d": 
 const SCENARIO: Record<string, string> = {
   tormenta: "Tormenta extrema",
   estructural: "Anomalía estructural",
+  rotura: "Rotura de presa",
   comunicacion: "Pérdida de comunicación",
 };
 

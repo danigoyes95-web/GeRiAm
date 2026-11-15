@@ -397,6 +397,13 @@
   background: rgba(7, 13, 24, 0.75);
   white-space: nowrap;
 }
+.geriam-far .geriam-point .gp-label {
+  display: none;
+}
+.geriam-far .geriam-point:hover .gp-label,
+.geriam-far .geriam-point:focus-visible .gp-label {
+  display: inline-block;
+}
 .geriam-user {
   width: 16px;
   height: 16px;

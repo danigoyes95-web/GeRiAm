@@ -2,14 +2,14 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, Gauge, ListChecks, Save, Send, Users } from "lucide-react";
+import { Building2, Gauge, ListChecks, MapPin, Save, Send, Users } from "lucide-react";
 import { usePanel } from "@/components/panel/PanelContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Input, SegmentedControl, Select, Skeleton } from "@/components/ui/misc";
 import { LEVELS } from "@/design/levels";
 import { ORG_LIVE_KEY, useOrgLive } from "@/lib/data/live";
-import type { Sensor } from "@/lib/data/types";
+import type { DownstreamPoint, Sensor } from "@/lib/data/types";
 import {
   ROLE_LABEL,
   SENSOR_LABEL,
@@ -22,7 +22,7 @@ import { getBrowserClient } from "@/lib/supabase/browser";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Tab = "umbrales" | "reglas" | "escalamiento" | "usuarios" | "organizacion";
+type Tab = "umbrales" | "reglas" | "puntos" | "escalamiento" | "usuarios" | "organizacion";
 const LV = ["amarilla", "naranja", "roja"] as const;
 
 async function audit(
@@ -213,6 +213,7 @@ export function ConfigPanel() {
           options={[
             { value: "umbrales", label: "Umbrales" },
             { value: "reglas", label: "Reglas" },
+            { value: "puntos", label: "Puntos" },
             { value: "escalamiento", label: "Escalamiento" },
             { value: "usuarios", label: "Usuarios" },
             { value: "organizacion", label: "Organización" },
@@ -293,6 +294,8 @@ export function ConfigPanel() {
             ))}
           </ul>
         </Card>
+      ) : tab === "puntos" ? (
+        <PointsTab />
       ) : tab === "escalamiento" ? (
         <Card>
           <CardHeader
@@ -402,6 +405,177 @@ export function ConfigPanel() {
             </ul>
           </div>
         </Card>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Puntos de control del río: ubicación, población expuesta y tiempos de llegada por presa.
+ * Lo edita el administrador (RLS) para reemplazar valores referenciales por los verificados en campo
+ * o por un estudio hidráulico (HEC-RAS). La estación de nivel del punto se mueve con él.
+ */
+function PointsTab() {
+  const panel = usePanel();
+  const { data } = useOrgLive();
+  if (!data) return null;
+  const canEdit = panel.role === "admin";
+  const order = (p: DownstreamPoint) => {
+    const r = data.routes.filter((x) => x.point_id === p.id).map((x) => x.tiempo_llegada_min);
+    return r.length ? Math.min(...r) : 9999;
+  };
+  const points = [...data.points].sort((a, b) => order(a) - order(b));
+  return (
+    <Card>
+      <CardHeader
+        title="Puntos de control del río"
+        subtitle={`${points.length} puntos, de aguas arriba hacia Ambato · ${canEdit ? "corrija con datos de campo o de un estudio HEC-RAS" : "solo el administrador puede editar"}`}
+        icon={<MapPin />}
+      />
+      <div className="divide-border divide-y">
+        {points.map((p) => (
+          <PointRow key={p.id} point={p} canEdit={canEdit} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function PointRow({ point, canEdit }: { point: DownstreamPoint; canEdit: boolean }) {
+  const panel = usePanel();
+  const qc = useQueryClient();
+  const { data } = useOrgLive();
+  const routes = (data?.routes ?? []).filter((r) => r.point_id === point.id);
+  const [f, setF] = useState({
+    lat: String(point.lat),
+    lng: String(point.lng),
+    pob: String(point.poblacion_expuesta ?? 0),
+    ok: point.verificado,
+    eta: Object.fromEntries(routes.map((r) => [r.site_id, String(r.tiempo_llegada_min)])) as Record<
+      string,
+      string
+    >,
+  });
+  const [busy, setBusy] = useState(false);
+  const site = (id: string) => data?.sites.find((x) => x.id === id);
+  const save = async () => {
+    const lat = Number(f.lat.replace(",", "."));
+    const lng = Number(f.lng.replace(",", "."));
+    const pob = Math.round(Number(f.pob));
+    if (!(lat > -2 && lat < 0) || !(lng > -80 && lng < -77))
+      return toast.error("Coordenadas fuera de Tungurahua (lat −2…0, lng −80…−77)");
+    if (!(pob >= 0)) return toast.error("Población no válida");
+    const etas = Object.entries(f.eta).map(([siteId, v]) => [siteId, Math.round(Number(v))] as const);
+    if (etas.some(([, v]) => !(v > 0 && v < 2000)))
+      return toast.error("Tiempo de llegada no válido (minutos)");
+    setBusy(true);
+    const sb = getBrowserClient();
+    const r = await sb
+      .from("downstream_points")
+      .update({ lat, lng, poblacion_expuesta: pob, verificado: f.ok })
+      .eq("id", point.id);
+    if (r.error) {
+      setBusy(false);
+      return toast.error(`No se pudo guardar: ${r.error.message}`);
+    }
+    if (point.nivel_rio_sensor_id)
+      await sb.from("sensors").update({ lat, lng }).eq("id", point.nivel_rio_sensor_id);
+    for (const [siteId, v] of etas) {
+      const prev = routes.find((x) => x.site_id === siteId);
+      if (prev && prev.tiempo_llegada_min !== v)
+        await sb
+          .from("site_downstream")
+          .update({ tiempo_llegada_min: v, fuente: `Editado por ${panel.name}` })
+          .eq("site_id", siteId)
+          .eq("point_id", point.id);
+    }
+    await audit(
+      panel.orgId,
+      { id: panel.userId, name: panel.name },
+      "configuracion.punto_control",
+      "downstream_point",
+      point.id,
+      {
+        punto: point.name,
+        antes: {
+          lat: point.lat,
+          lng: point.lng,
+          poblacion: point.poblacion_expuesta,
+          verificado: point.verificado,
+        },
+        despues: { lat, lng, poblacion: pob, verificado: f.ok },
+        llegada_min: Object.fromEntries(etas.map(([id, v]) => [site(id)?.code ?? id, v])),
+      },
+    );
+    await qc.invalidateQueries({ queryKey: ORG_LIVE_KEY });
+    setBusy(false);
+    toast.success(`Punto ${point.name} actualizado`);
+  };
+  return (
+    <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto] lg:items-end">
+      <div className="min-w-0">
+        <p className="font-medium">{point.name}</p>
+        <p className={cn("text-[11px]", point.verificado ? "text-lvl-normal" : "text-lvl-amarilla")}>
+          {point.verificado ? "Ubicación verificada" : "Ubicación por verificar en campo"}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+        <label className="space-y-1">
+          <span className="text-fg-muted block text-[11px]">Latitud</span>
+          <Input
+            inputMode="decimal"
+            value={f.lat}
+            disabled={!canEdit}
+            onChange={(e) => setF({ ...f, lat: e.target.value })}
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-fg-muted block text-[11px]">Longitud</span>
+          <Input
+            inputMode="decimal"
+            value={f.lng}
+            disabled={!canEdit}
+            onChange={(e) => setF({ ...f, lng: e.target.value })}
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-fg-muted block text-[11px]">Habitantes expuestos</span>
+          <Input
+            inputMode="numeric"
+            value={f.pob}
+            disabled={!canEdit}
+            onChange={(e) => setF({ ...f, pob: e.target.value })}
+          />
+        </label>
+        <label className="flex h-9 items-center gap-2 self-end text-sm">
+          <input
+            type="checkbox"
+            checked={f.ok}
+            disabled={!canEdit}
+            onChange={(e) => setF({ ...f, ok: e.target.checked })}
+            className="size-4 accent-[var(--accent)]"
+          />
+          Verificado
+        </label>
+        {routes.map((r) => (
+          <label key={r.site_id} className="space-y-1">
+            <span className="text-fg-muted block text-[11px]">
+              Llegada desde {site(r.site_id)?.name.replace("Embalse ", "")} (min) ·{" "}
+              {formatNumber(Number(r.distancia_km ?? 0), 1)} km
+            </span>
+            <Input
+              inputMode="numeric"
+              value={f.eta[r.site_id] ?? ""}
+              disabled={!canEdit}
+              onChange={(e) => setF({ ...f, eta: { ...f.eta, [r.site_id]: e.target.value } })}
+            />
+          </label>
+        ))}
+      </div>
+      {canEdit && (
+        <Button size="sm" onClick={save} disabled={busy}>
+          <Save /> Guardar
+        </Button>
       )}
     </div>
   );

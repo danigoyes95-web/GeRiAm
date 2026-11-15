@@ -4,7 +4,7 @@
  */
 import type { Forcing } from "./physics";
 
-export type ScenarioId = "tormenta" | "estructural" | "comunicacion";
+export type ScenarioId = "tormenta" | "estructural" | "comunicacion" | "rotura";
 
 export interface ScenarioPhase {
   forcing: Forcing;
@@ -23,8 +23,15 @@ export interface ScenarioDef {
   /** cota inicial relativa al NAMO (m) para que el escenario sea demostrable */
   startOffsetNamo: number | null;
   steps: { atMin: number; label: string }[];
+  /** admite varios embalses a la vez (cada uno con su propio desfase) */
+  multiSite?: boolean;
   at(minute: number): ScenarioPhase;
 }
+
+/** Rotura de presa: minuto (desde el inicio de cada presa) en que se abre la brecha. */
+export const ROTURA_BREACH_AT = 25;
+/** Desfase entre presas cuando se rompen varias (min). */
+export const ROTURA_STAGGER = 12;
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
@@ -44,8 +51,16 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
       { atMin: 240, label: "Nivel cercano a cresta" },
     ],
     at(m) {
-      const rain = m < 30 ? 12 + m * 1.1 : m < 210 ? 52 + 6 * Math.sin(m / 9) : m < 300 ? clamp(52 - (m - 210) * 0.55, 0, 52) : 2;
-      const phase = m < 30 ? "lluvia" : m < 90 ? "crecida" : m < 210 ? "vertedero" : m < 300 ? "pico" : "recesion";
+      const rain =
+        m < 30
+          ? 12 + m * 1.1
+          : m < 210
+            ? 52 + 6 * Math.sin(m / 9)
+            : m < 300
+              ? clamp(52 - (m - 210) * 0.55, 0, 52)
+              : 2;
+      const phase =
+        m < 30 ? "lluvia" : m < 90 ? "crecida" : m < 210 ? "vertedero" : m < 300 ? "pico" : "recesion";
       const narrative =
         phase === "lluvia"
           ? "Lluvia en aumento sobre el páramo"
@@ -86,7 +101,12 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
             : phase === "asentamiento"
               ? "Salto de asentamiento detectado en la cresta"
               : "Deformación progresiva del talud aguas abajo";
-      return { forcing: { rainMmH: 0, pz1Delta: pz1, pz2Delta: pz2, inclDelta }, phase, narrative, settleOffset };
+      return {
+        forcing: { rainMmH: 0, pz1Delta: pz1, pz2Delta: pz2, inclDelta },
+        phase,
+        narrative,
+        settleOffset,
+      };
     },
   },
   comunicacion: {
@@ -115,6 +135,57 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
               ? "Sin enlace: la presa no reporta"
               : "Enlace restablecido, datos fluyendo";
       return { forcing: { starlinkDown: down, latencyBoost: boost }, phase, narrative };
+    },
+  },
+  rotura: {
+    id: "rotura",
+    title: "Rotura de presa",
+    summary:
+      "Falla por tubificación en día seco con el embalse lleno: filtración y presión de poro anómalas, salto de asentamiento y apertura de la brecha (Froehlich 2008). La onda baja por el río y llega a cada punto de control en su tiempo calculado. Se puede romper una o varias presas a la vez.",
+    durationMin: 230,
+    startOffsetNamo: 0,
+    multiSite: true,
+    steps: [
+      { atMin: 0, label: "Embalse lleno, sin lluvia" },
+      { atMin: 5, label: "Filtración y presión de poro en ascenso" },
+      { atMin: 15, label: "Salto de asentamiento en la cresta" },
+      { atMin: ROTURA_BREACH_AT, label: "Se abre la brecha: la presa falla" },
+      { atMin: ROTURA_BREACH_AT + 30, label: "Embalse vaciándose, onda en el río" },
+    ],
+    at(m) {
+      if (m < 0)
+        return { forcing: { rainMmH: 0 }, phase: "espera", narrative: "Presa estable (aún sin falla)" };
+      const pz1 = m < 5 ? 0 : clamp((m - 5) * 3.2, 0, 60);
+      const pz2 = m < 10 ? 0 : clamp((m - 10) * 2.4, 0, 45);
+      const settleOffset = m >= 20 ? 9 : m >= 15 ? 3.5 : 0;
+      const inclDelta = m >= 18 ? 6 : 0;
+      const breachMin = m >= ROTURA_BREACH_AT ? m - ROTURA_BREACH_AT : undefined;
+      const phase =
+        m < 5
+          ? "normal"
+          : m < 15
+            ? "filtracion"
+            : m < ROTURA_BREACH_AT
+              ? "asentamiento"
+              : m < ROTURA_BREACH_AT + 30
+                ? "brecha"
+                : "onda";
+      const narrative =
+        phase === "normal"
+          ? "Embalse lleno y estable, día seco"
+          : phase === "filtracion"
+            ? "Filtración turbia al pie de la presa: la presión de poro sube sin lluvia"
+            : phase === "asentamiento"
+              ? "Salto de asentamiento y deformación de la cresta: falla inminente"
+              : phase === "brecha"
+                ? "La presa falla: la brecha se abre y el embalse se vacía"
+                : "La onda de crecida baja por el río hacia Ambato";
+      return {
+        forcing: { rainMmH: 0, pz1Delta: pz1, pz2Delta: pz2, inclDelta, breachMin },
+        phase,
+        narrative,
+        settleOffset,
+      };
     },
   },
 };

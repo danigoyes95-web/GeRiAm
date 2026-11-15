@@ -165,39 +165,45 @@ export function DrillHud({ scene, className }: { scene: DrillScene; className?: 
         <span className="text-[11px] text-white/60">horas simuladas</span>
       </div>
       {scene.narrative && <div className="mt-1 text-[12px] text-white/85">{scene.narrative}</div>}
-      <div className="mt-2.5 grid grid-cols-2 gap-2 text-[11px]">
-        <div className="rounded-md bg-white/5 p-1.5">
-          <div className="flex items-center gap-1 text-white/60">
-            <CloudRain className="size-3" aria-hidden /> Lluvia
+      {scene.scenario === "rotura" ? (
+        <RuptureTiles scene={scene} />
+      ) : (
+        <div className="mt-2.5 grid grid-cols-2 gap-2 text-[11px]">
+          <div className="rounded-md bg-white/5 p-1.5">
+            <div className="flex items-center gap-1 text-white/60">
+              <CloudRain className="size-3" aria-hidden /> Lluvia
+            </div>
+            <div className="tabular font-mono text-sm font-semibold">
+              {formatNumber(scene.rainMmH, 0)} mm/h
+            </div>
+            <div className="mt-1 h-1 overflow-hidden rounded bg-white/10">
+              <div
+                className="h-full rounded bg-sky-400"
+                style={{ width: `${Math.min(100, (scene.rainMmH / 60) * 100)}%` }}
+              />
+            </div>
           </div>
-          <div className="tabular font-mono text-sm font-semibold">{formatNumber(scene.rainMmH, 0)} mm/h</div>
-          <div className="mt-1 h-1 overflow-hidden rounded bg-white/10">
+          <div className="rounded-md bg-white/5 p-1.5">
+            <div className="flex items-center gap-1 text-white/60">
+              <Waves className="size-3" aria-hidden /> Borde libre
+            </div>
             <div
-              className="h-full rounded bg-sky-400"
-              style={{ width: `${Math.min(100, (scene.rainMmH / 60) * 100)}%` }}
-            />
+              className={cn(
+                "tabular font-mono text-sm font-semibold",
+                free !== null && free < 0.8 && "text-lvl-roja",
+              )}
+            >
+              {free === null ? "—" : `${formatNumber(free, 2)} m`}
+            </div>
+            <div className="mt-1 h-1 overflow-hidden rounded bg-white/10">
+              <div
+                className="bg-lvl-roja h-full rounded"
+                style={{ width: `${free === null ? 0 : Math.min(100, Math.max(0, (1 - free / 3) * 100))}%` }}
+              />
+            </div>
           </div>
         </div>
-        <div className="rounded-md bg-white/5 p-1.5">
-          <div className="flex items-center gap-1 text-white/60">
-            <Waves className="size-3" aria-hidden /> Borde libre
-          </div>
-          <div
-            className={cn(
-              "tabular font-mono text-sm font-semibold",
-              free !== null && free < 0.8 && "text-lvl-roja",
-            )}
-          >
-            {free === null ? "—" : `${formatNumber(free, 2)} m`}
-          </div>
-          <div className="mt-1 h-1 overflow-hidden rounded bg-white/10">
-            <div
-              className="bg-lvl-roja h-full rounded"
-              style={{ width: `${free === null ? 0 : Math.min(100, Math.max(0, (1 - free / 3) * 100))}%` }}
-            />
-          </div>
-        </div>
-      </div>
+      )}
       {scene.scenario === "tormenta" && <FlowEquivalence scene={scene} />}
       {ambato && (
         <div className="border-lvl-roja/50 bg-lvl-roja/15 mt-2 flex items-center justify-between rounded-md border px-2 py-1.5 text-[11px]">
@@ -207,6 +213,56 @@ export function DrillHud({ scene, className }: { scene: DrillScene; className?: 
           <b className="tabular font-mono text-sm">
             {ambato.remainingMin <= 0 ? "AHORA" : fmtMin(ambato.remainingMin)}
           </b>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Rotura: caudal por la brecha y próximo punto de control que recibirá la onda. */
+function RuptureTiles({ scene }: { scene: DrillScene }) {
+  const next = scene.etas.find((e) => e.remainingMin > 0);
+  const reached = scene.etas.filter((e) => e.remainingMin <= 0);
+  const people = reached.reduce((a, e) => a + (e.poblacion ?? 0), 0);
+  return (
+    <div className="mt-2.5 grid grid-cols-2 gap-2 text-[11px]">
+      <div className="rounded-md bg-white/5 p-1.5">
+        <div className="flex items-center gap-1 text-white/60">
+          <Waves className="size-3" aria-hidden /> Caudal de salida
+        </div>
+        <div
+          className={cn(
+            "tabular font-mono text-sm font-semibold",
+            (scene.damOutflow ?? 0) > 50 && "text-lvl-roja",
+          )}
+        >
+          {scene.damOutflow === null ? "—" : `${formatNumber(scene.damOutflow, 0)} m³/s`}
+        </div>
+        <div className="mt-1 h-1 overflow-hidden rounded bg-white/10">
+          <div
+            className="bg-lvl-roja h-full rounded"
+            style={{ width: `${Math.min(100, ((scene.damOutflow ?? 0) / 3000) * 100)}%` }}
+          />
+        </div>
+      </div>
+      <div className="rounded-md bg-white/5 p-1.5">
+        <div className="flex items-center gap-1 text-white/60">
+          <Timer className="size-3" aria-hidden /> {next ? "Próximo punto" : "Onda"}
+        </div>
+        {next ? (
+          <>
+            <div className="truncate text-[11px] font-semibold">{next.name}</div>
+            <div className="tabular font-mono text-sm font-semibold">{fmtMin(next.remainingMin)}</div>
+          </>
+        ) : (
+          <div className="text-sm font-semibold">
+            {scene.etas.length ? "Llegó a todos" : "Aún sin brecha"}
+          </div>
+        )}
+      </div>
+      {reached.length > 0 && (
+        <div className="col-span-2 rounded-md bg-white/5 px-1.5 py-1 text-white/75">
+          Onda en {reached.length} de {scene.etas.length} puntos · {formatNumber(people, 0)} hab. expuestos
         </div>
       )}
     </div>

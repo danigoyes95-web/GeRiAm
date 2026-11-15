@@ -40,6 +40,10 @@ const only = args.only ? new Set(String(args.only).split(",")) : null;
 const run = (step: string) => !only || only.has(step);
 /** --site=CQH: sembrar o rellenar solo ese embalse, sin tocar los demás (umbrales editados, etc.). */
 const siteFilter = args.site ? String(args.site) : null;
+/** --points: solo puntos de control (zonas, puntos, rutas y sus estaciones de nivel), sin tocar embalses. */
+const pointsOnly = !!args.points;
+/** --codes=A,B: el backfill solo genera lecturas de esos sensores y no altera el estado vivo. */
+const codeFilter = args.codes ? new Set(String(args.codes).split(",")) : null;
 
 function ok<T>(r: { data: T; error: { message: string } | null }, what: string): NonNullable<T> {
   if (r.error) throw new Error(`${what}: ${r.error.message}`);
@@ -73,6 +77,54 @@ async function seed() {
   }
 
   for (const s of SITES.filter((x) => !siteFilter || x.code === siteFilter)) {
+    if (pointsOnly) {
+      const site = ok(await sb.from("sites").select("id").eq("organization_id", org.id).eq("code", s.code).single(), "site");
+      for (const d of s.downstream) {
+        ok(
+          await sb.from("site_downstream").upsert(
+            { site_id: site.id, point_id: points[d.point], organization_id: org.id, distancia_km: d.distancia_km, tiempo_llegada_min: d.llegada_min, tiempo_transito_normal_min: d.transito_min, fuente: d.fuente },
+            { onConflict: "site_id,point_id" },
+          ),
+          "route",
+        );
+      }
+      for (const se of s.sensors.filter((x) => x.downstreamPoint)) {
+        const r = ok(
+          await sb
+            .from("sensors")
+            .upsert(
+              {
+                organization_id: org.id,
+                site_id: site.id,
+                gateway_id: null,
+                code: se.code,
+                name: se.name,
+                type: se.type,
+                dev_eui: null,
+                unit: se.unit,
+                decimals: se.decimals,
+                lat: se.lat,
+                lng: se.lng,
+                position_label: se.position,
+                battery_pct: se.battery,
+                rssi: se.rssi,
+                snr: se.snr,
+                report_interval_s: se.interval_s,
+                thresholds: (se.thresholds ?? {}) as never,
+                status: "activo",
+                data_source: "simulado",
+                metadata: { enlace: "celular/API", downstream_point: se.downstreamPoint } as never,
+              },
+              { onConflict: "organization_id,code" },
+            )
+            .select("id")
+            .single(),
+          `sensor ${se.code}`,
+        );
+        await sb.from("downstream_points").update({ nivel_rio_sensor_id: r.id }).eq("id", points[se.downstreamPoint!]);
+      }
+      continue;
+    }
     const site = ok(
       await sb
         .from("sites")
@@ -207,6 +259,10 @@ async function seed() {
     ),
     "escalation",
   );
+  if (pointsOnly) {
+    console.log(`✓ puntos de control: ${DOWNSTREAM_POINTS.length}`);
+    return org.id;
+  }
   console.log(`✓ semilla: ${SITES.length} embalses, ${SITES.reduce((a, s) => a + s.sensors.length, 0)} sensores, ${DOWNSTREAM_POINTS.length} puntos aguas abajo`);
   return org.id;
 }
@@ -269,8 +325,9 @@ async function secrets(orgId: string) {
 
 async function backfill(orgId: string, days: number) {
   const b = await loadOrgBundle(sb, orgId);
-  const targets = b.sites.filter((s) => !siteFilter || s.code === siteFilter);
-  const targetSensors = b.sensors.filter((x) => targets.some((s) => s.id === x.site_id)).map((x) => x.id);
+  // con --codes se simulan todos los embalses (las estaciones del río dependen de todos) pero solo se emiten esos sensores
+  const targets = b.sites.filter((s) => codeFilter || !siteFilter || s.code === siteFilter);
+  const targetSensors = b.sensors.filter((x) => (codeFilter ? codeFilter.has(x.code) : targets.some((s) => s.id === x.site_id))).map((x) => x.id);
   const count = await sb.from("readings").select("sensor_id", { count: "exact", head: true }).eq("organization_id", orgId).in("sensor_id", targetSensors);
   if ((count.count ?? 0) > 0 && !args.force) {
     console.log(`• backfill omitido: ya hay ${count.count} lecturas (use --force)`);
@@ -290,7 +347,9 @@ async function backfill(orgId: string, days: number) {
     for (const s of targets) states[s.code] = stepSite(paramsFor(s), states[s.code], 900);
     for (const s of targets) {
       const st = { ...states[s.code], lastEmit: { ...states[s.code].lastEmit }, battery: { ...states[s.code].battery } };
-      const readings = emitReadings(st, simSensorsFor(b, s), states, { mode: "backfill", stepS: 900 });
+      const sensors = simSensorsFor(b, s).filter((x) => !codeFilter || codeFilter.has(x.code));
+      if (!sensors.length) continue;
+      const readings = emitReadings(st, sensors, states, { mode: "backfill", stepS: 900 });
       states[s.code] = st;
       buffer.push(...readingRows(orgId, st, readings));
     }
@@ -303,7 +362,7 @@ async function backfill(orgId: string, days: number) {
   }
   await insertReadings(sb, buffer);
   total += buffer.length;
-  await saveStates(sb, b, states);
+  if (!codeFilter) await saveStates(sb, b, states);
   console.log(`\n✓ backfill: ${total} lecturas (${days} días a 15 min)`);
 }
 

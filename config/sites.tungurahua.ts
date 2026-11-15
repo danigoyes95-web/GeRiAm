@@ -108,12 +108,29 @@ export const ZONES = [
   { code: "Z2", name: "Pasa", description: "Parroquia Pasa y riberas del río Ambato" },
   { code: "Z3", name: "Quisapincha", description: "Parroquia Quisapincha y riberas" },
   { code: "Z4", name: "Ambato urbano", description: "Ribera del río Ambato en la ciudad" },
+  { code: "Z5", name: "Río Ambato alto", description: "Calamaca, Manzana Huaico, La Playa y quebrada Chiquicahua (Pilahuín – San Fernando)" },
 ];
 
-export const DOWNSTREAM_POINTS = [
-  { key: "pasa", name: "Pasa", kind: "poblado", lat: -1.2685, lng: -78.7262, zone: "Z2", poblacion: 850, verificado: false },
-  { key: "quisapincha", name: "Quisapincha", kind: "poblado", lat: -1.2412, lng: -78.6794, zone: "Z3", poblacion: 1200, verificado: false },
-  { key: "ambato", name: "Ambato (ciudad)", kind: "ciudad", lat: -1.2491, lng: -78.6168, zone: "Z4", poblacion: 14500, verificado: false },
+/**
+ * Puntos de control sobre el río (de aguas arriba hacia aguas abajo). Cada uno tiene una estación
+ * hidrométrica (nivel del río) y tiempos de llegada desde cada presa. Las coordenadas están ajustadas
+ * al cauce trazado sobre el relieve; las marcadas "por verificar" deben confirmarse en campo
+ * (se pueden corregir en Configuración → Puntos de control).
+ */
+export const DOWNSTREAM_POINTS: {
+  key: string; code: string; name: string; kind: string; lat: number; lng: number; zone: string; poblacion: number; verificado: boolean; nota: string;
+}[] = [
+  { key: "calamanca", code: "CAL", name: "Desembocadura del río Calamanca", kind: "confluencia", lat: -1.27835, lng: -78.82292, zone: "Z5", poblacion: 300, verificado: false, nota: "Confluencia del río Calamanca (Chiquiurco y Mulacorral) con el río Ambato, junto a Calamaca" },
+  { key: "manzana_huaico", code: "MZH", name: "Manzana Huaico", kind: "poblado", lat: -1.27851, lng: -78.76058, zone: "Z5", poblacion: 250, verificado: false, nota: "Sitio de la estación hidrológica INAMHI H1143 «Ambato en Manzanahuaico» (longitud del inventario INAMHI)" },
+  { key: "la_playa", code: "PLY", name: "La Playa", kind: "poblado", lat: -1.27841, lng: -78.75648, zone: "Z5", poblacion: 400, verificado: false, nota: "Sector La Playa (San Fernando), ribera del río Ambato" },
+  { key: "q_chiquicahua", code: "QCH", name: "Quebrada Chiquicahua", kind: "confluencia", lat: -1.29093, lng: -78.74371, zone: "Z5", poblacion: 150, verificado: false, nota: "Quebrada Chiquicahua 1 km antes de su confluencia con el río Ambato" },
+  { key: "pasa", code: "PAS", name: "Pasa", kind: "poblado", lat: -1.2685, lng: -78.7262, zone: "Z2", poblacion: 850, verificado: false, nota: "Cabecera parroquial" },
+  { key: "aguajan", code: "AGJ", name: "Aguaján", kind: "poblado", lat: -1.28671, lng: -78.70509, zone: "Z3", poblacion: 600, verificado: false, nota: "Sector Aguaján (km 11½ vía Ambato–Pasa), aguas termales y puente de la vía Flores" },
+  { key: "quisapincha", code: "QUI", name: "Quisapincha", kind: "poblado", lat: -1.2412, lng: -78.6794, zone: "Z3", poblacion: 1200, verificado: false, nota: "Cabecera parroquial" },
+  { key: "la_victoria", code: "VIC", name: "La Victoria", kind: "barrio", lat: -1.23162, lng: -78.61035, zone: "Z4", poblacion: 2500, verificado: false, nota: "Barrio La Victoria (Atocha–Ficoa), ribera norte del río Ambato" },
+  { key: "ambato", code: "AMB", name: "Ambato (ciudad)", kind: "ciudad", lat: -1.2491, lng: -78.6168, zone: "Z4", poblacion: 14500, verificado: false, nota: "Población ribereña de la ciudad" },
+  { key: "el_progreso", code: "PRG", name: "El Progreso", kind: "barrio", lat: -1.25084, lng: -78.60396, zone: "Z4", poblacion: 1800, verificado: false, nota: "Barrio El Progreso, ribera del río Ambato aguas abajo del centro" },
+  { key: "siderurgica", code: "SID", name: "Siderúrgica Tungurahua", kind: "industria", lat: -1.24132, lng: -78.58802, zone: "Z4", poblacion: 350, verificado: false, nota: "Planta industrial junto al río Ambato (trabajadores por turno)" },
 ];
 
 function lvl(namo: number, cresta: number): Thresholds {
@@ -213,9 +230,16 @@ export const SITES: SiteSeed[] = [
     },
     cauce: CAUCES.CHQ as [number, number][],
     downstream: [
-      { point: "pasa", distancia_km: 27, llegada_min: 50, transito_min: 125, fuente: "Estimación referencial (HEC-RAS 2D Chiquiurco–Pasa)" },
-      { point: "quisapincha", distancia_km: 34, llegada_min: 92, transito_min: 210, fuente: "Estimación referencial" },
-      { point: "ambato", distancia_km: 41, llegada_min: 130, transito_min: 290, fuente: "Estimación referencial" },
+      { point: "calamanca", distancia_km: 8.8, llegada_min: 21, transito_min: 52, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "manzana_huaico", distancia_km: 17.0, llegada_min: 40, transito_min: 100, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "la_playa", distancia_km: 17.5, llegada_min: 41, transito_min: 103, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "pasa", distancia_km: 21.3, llegada_min: 50, transito_min: 125, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "aguajan", distancia_km: 24.1, llegada_min: 66, transito_min: 157, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "quisapincha", distancia_km: 28.7, llegada_min: 92, transito_min: 210, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "la_victoria", distancia_km: 38.6, llegada_min: 123, transito_min: 276, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "ambato", distancia_km: 40.6, llegada_min: 130, transito_min: 290, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "el_progreso", distancia_km: 42.1, llegada_min: 135, transito_min: 300, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
+      { point: "siderurgica", distancia_km: 45.5, llegada_min: 145, transito_min: 323, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Chiquiurco (distancia por el cauce trazado)" },
     ],
     sensors: [],
     cameras: [
@@ -261,9 +285,16 @@ export const SITES: SiteSeed[] = [
     },
     cauce: CAUCES.MLC as [number, number][],
     downstream: [
-      { point: "pasa", distancia_km: 29, llegada_min: 55, transito_min: 135, fuente: "Estimación referencial" },
-      { point: "quisapincha", distancia_km: 36, llegada_min: 98, transito_min: 225, fuente: "Estimación referencial" },
-      { point: "ambato", distancia_km: 42, llegada_min: 140, transito_min: 310, fuente: "Estudio HEC-RAS 2D rotura Mulacorral (140 min)" },
+      { point: "calamanca", distancia_km: 10.1, llegada_min: 25, transito_min: 60, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "manzana_huaico", distancia_km: 18.3, llegada_min: 45, transito_min: 109, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "la_playa", distancia_km: 18.8, llegada_min: 46, transito_min: 112, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "pasa", distancia_km: 22.6, llegada_min: 55, transito_min: 135, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "aguajan", distancia_km: 25.4, llegada_min: 71, transito_min: 169, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "quisapincha", distancia_km: 30.0, llegada_min: 98, transito_min: 225, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "la_victoria", distancia_km: 39.9, llegada_min: 133, transito_min: 295, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "ambato", distancia_km: 41.9, llegada_min: 140, transito_min: 310, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "el_progreso", distancia_km: 43.4, llegada_min: 145, transito_min: 320, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
+      { point: "siderurgica", distancia_km: 46.8, llegada_min: 157, transito_min: 345, fuente: "Onda de rotura escalada desde el estudio HEC-RAS 2D Mulacorral (distancia por el cauce trazado)" },
     ],
     sensors: [],
     cameras: [
@@ -316,9 +347,14 @@ export const SITES: SiteSeed[] = [
     },
     cauce: CAUCES.CQH as [number, number][],
     downstream: [
+      { point: "q_chiquicahua", distancia_km: 9.0, llegada_min: 19, transito_min: 42, fuente: "Estimación referencial (distancia por el cauce trazado)" },
       { point: "pasa", distancia_km: 11.7, llegada_min: 25, transito_min: 55, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+      { point: "aguajan", distancia_km: 14.5, llegada_min: 42, transito_min: 84, fuente: "Estimación referencial (distancia por el cauce trazado)" },
       { point: "quisapincha", distancia_km: 19.1, llegada_min: 70, transito_min: 130, fuente: "Estimación referencial (distancia por el cauce trazado)" },
-      { point: "ambato", distancia_km: 30.3, llegada_min: 125, transito_min: 255, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+      { point: "la_victoria", distancia_km: 29.0, llegada_min: 116, transito_min: 234, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+      { point: "ambato", distancia_km: 31.1, llegada_min: 125, transito_min: 255, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+      { point: "el_progreso", distancia_km: 32.5, llegada_min: 132, transito_min: 270, fuente: "Estimación referencial (distancia por el cauce trazado)" },
+      { point: "siderurgica", distancia_km: 35.9, llegada_min: 147, transito_min: 306, fuente: "Estimación referencial (distancia por el cauce trazado)" },
     ],
     sensors: [],
     cameras: [
@@ -336,7 +372,7 @@ SITES[2].sensors = siteSensors("CQH", CQH_LAKE, CQH_DAM, [-1.3605, -78.7618], SI
 // Estaciones hidrométricas en puntos de control (vinculadas a Chiquiurco, enlace celular/API)
 for (const dp of DOWNSTREAM_POINTS) {
   SITES[0].sensors.push({
-    code: `RIO-${dp.key.toUpperCase().slice(0, 3)}-01`,
+    code: `RIO-${dp.code}-01`,
     name: `Estación hidrométrica ${dp.name}`,
     type: "nivel_rio",
     unit: "m",
