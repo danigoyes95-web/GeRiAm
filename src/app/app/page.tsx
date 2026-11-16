@@ -23,7 +23,13 @@ export default function AppHome() {
   const now = useNow(15_000) ?? undefined;
   const nivelIds = summaries.map((s) => s.nivel?.id).filter((x): x is string => !!x);
   const series = useSeries(nivelIds, 3, 600, { enabled: !fromCache });
-  const alerts = sortAlerts(data?.alerts ?? []);
+  const all = sortAlerts(data?.alerts ?? []);
+  // avisos de llegada de la onda a los puntos de control de la zona: primero y en grande
+  const arrivalAt = (a: (typeof all)[number]) =>
+    (((a.trigger_values ?? {}) as { sim_started_min?: number }).sim_started_min ?? 0) +
+    (alertEta(a)[0]?.minutes ?? 0);
+  const arrivals = all.filter((a) => a.type === "llegada").sort((x, y) => arrivalAt(x) - arrivalAt(y));
+  const alerts = all.filter((a) => a.type !== "llegada");
   const top = alerts[0];
 
   return (
@@ -32,6 +38,24 @@ export default function AppHome() {
         <p className="text-fg-muted text-sm">Hola, {app.name.split(" ")[0]}</p>
         <h1 className="text-xl font-semibold tracking-tight">Estado de los embalses</h1>
       </div>
+
+      {arrivals.map((a) => (
+        <Link
+          key={a.id}
+          href={`/app/alertas/${a.id}`}
+          className="border-lvl-roja bg-lvl-roja/10 block rounded-xl border-2 p-4"
+        >
+          <p className="text-lvl-roja flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase">
+            <Siren className="size-4 animate-pulse" aria-hidden />
+            {a.drill_run_id ? "Simulacro · " : ""}Evacuación
+          </p>
+          <p className="mt-1 text-lg leading-snug font-semibold">{a.title}</p>
+          <div className="mt-3">
+            <AlertCountdown alert={a} drill={data?.drill} size="lg" />
+          </div>
+          {a.description && <p className="text-fg-muted mt-2 text-sm leading-relaxed">{a.description}</p>}
+        </Link>
+      ))}
 
       <RiverForecast reaches={["ambato", "pasa"]} showWarnings />
 

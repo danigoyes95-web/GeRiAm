@@ -424,7 +424,7 @@ export const DEMO_USERS: { email: string; full_name: string; role: Role; zones: 
   { email: "admin@geriam.demo", full_name: "Administración GeRiAm", role: "admin", zones: ["Z1", "Z2", "Z3", "Z4"], phone: null, channels: ["push", "sms"] },
   { email: "operador@geriam.demo", full_name: "Operador de sala", role: "operador", zones: ["Z1", "Z2", "Z3", "Z4"], phone: null, channels: ["push", "whatsapp"] },
   { email: "tecnico@geriam.demo", full_name: "Técnico de campo — Cuenca alta", role: "tecnico", zones: ["Z1"], phone: null, channels: ["push", "whatsapp"] },
-  { email: "director.pasa@geriam.demo", full_name: "Director de junta — Pasa", role: "director_junta", zones: ["Z2"], phone: null, channels: ["push", "sms"] },
+  { email: "director.pasa@geriam.demo", full_name: "Director de junta — Pasa", role: "director_junta", zones: ["Z2", "Z5"], phone: null, channels: ["push", "sms"] },
   { email: "observador@geriam.demo", full_name: "Observador institucional", role: "observador", zones: [], phone: null, channels: ["push"] },
 ];
 export const DEMO_PASSWORD = "GeRiAm-Demo-2026";
