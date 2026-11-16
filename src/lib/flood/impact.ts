@@ -272,6 +272,8 @@ export function computeImpact(
         const A = arr[di].a[r];
         if (A < 0) continue;
         const d = dams[di];
+        // el agua no llega a un tramo antes que el frente de la onda (su tiempo de llegada)
+        if (t - d.breachAtMin < A - 1) continue;
         const center = Math.max(0, A - LEAD_MIN);
         const spread = 5 + 0.1 * A;
         // agua que salió de la presa entre (t − breach − center − spread) y (t − breach − center + spread)

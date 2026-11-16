@@ -391,6 +391,11 @@ const BREACH_LEAD_MIN = 10;
 export function breachWaveAt(s: SiteState, arrivalMin: number, km: number): number {
   const h = s.breachHist;
   if (!h?.length) return 0;
+  // el agua no llega antes que el frente: minutos desde que se abrió la brecha (primer registro con caudal)
+  const first = h.findIndex((v) => v > 0);
+  if (first < 0) return 0;
+  const sinceBreach = (h.length - first) * 5;
+  if (sinceBreach < arrivalMin - 2.5) return 0;
   // el frente (caudal ya significativo, ~10 min después de abrirse la brecha) llega en el tiempo de llegada
   const center = Math.max(0, arrivalMin - BREACH_LEAD_MIN);
   const spread = 5 + 0.1 * arrivalMin;

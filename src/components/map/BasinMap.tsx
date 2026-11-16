@@ -127,6 +127,30 @@ const floodIds = (i: number) =>
     ? { src: `flood-${i}`, glow: `flood-glow-${i}`, line: `flood-line-${i}` }
     : { src: "flood", glow: "flood-glow", line: "flood-line" };
 
+/** Punto a una fracción (0–1) del largo de una línea (aprox. plana, suficiente a escala de cuenca). */
+function pointAlong(coords: [number, number][], f: number): [number, number] {
+  const k = Math.cos((coords[0][1] * Math.PI) / 180);
+  const seg: number[] = [];
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const d = Math.hypot((coords[i][0] - coords[i - 1][0]) * k, coords[i][1] - coords[i - 1][1]);
+    seg.push(d);
+    total += d;
+  }
+  let target = f * total;
+  for (let i = 0; i < seg.length; i++) {
+    if (target <= seg[i]) {
+      const t = seg[i] ? target / seg[i] : 0;
+      return [
+        coords[i][0] + (coords[i + 1][0] - coords[i][0]) * t,
+        coords[i][1] + (coords[i + 1][1] - coords[i][1]) * t,
+      ];
+    }
+    target -= seg[i];
+  }
+  return coords[coords.length - 1];
+}
+
 export function BasinMap({
   center,
   sites,
@@ -185,6 +209,10 @@ export function BasinMap({
         language: "es",
       });
       mapRef.current = map;
+      if (
+        process.env.NODE_ENV !== "production" ||
+        (globalThis as { __GERIAM_DEBUG__?: boolean }).__GERIAM_DEBUG__
+      )
       if (interactive) map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
       map.on("error", (e) => {
         const ev = e as { sourceId?: string; error?: { message?: string; status?: number } };
@@ -803,6 +831,13 @@ export function BasinMap({
     [],
   );
 
+  // sin simulacro, la cámara vuelve a centrarse en todo el mapa
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || sceneSite || !alive(map)) return;
+    map.setPadding({ left: 0, top: 0, right: 0, bottom: 0 });
+  }, [ready, sceneSite]);
+
   // cámara: al iniciar, ir a la presa; cuando sale la crecida, seguir el cauce
   useEffect(() => {
     const map = mapRef.current;
@@ -819,19 +854,50 @@ export function BasinMap({
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, sceneSite]);
+  // al salir la crecida la cámara acompaña al frente río abajo, desde la presa (salvo que la persona mueva el mapa)
+  const userMovedAt = useRef(0);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !floodOn || !sceneSite) return;
-    const line = sites.find((x) => x.site.id === sceneSite)?.site.cauce_geojson as unknown as
+    if (!map || !ready) return;
+    // solo los gestos de la persona (los eventos de la cámara programada no traen originalEvent)
+    const mark = (e: object) => {
+      if ("originalEvent" in e && e.originalEvent) userMovedAt.current = Date.now();
+    };
+    map.on("dragstart", mark);
+    map.on("zoomstart", mark);
+    map.on("rotatestart", mark);
+    map.on("pitchstart", mark);
+    return () => {
+      if (!alive(map)) return;
+      map.off("dragstart", mark);
+      map.off("zoomstart", mark);
+      map.off("rotatestart", mark);
+      map.off("pitchstart", mark);
+    };
+  }, [ready]);
+  const front = scene?.floods[0];
+  const frontKey = front ? `${front.siteId}:${Math.round(front.fraction * 40)}` : "";
+  useEffect(() => {
+    const map = mapRef.current;
+    const fl = sceneRef.current?.floods[0];
+    if (!map || !ready || !fl || Date.now() - userMovedAt.current < 15_000) return;
+    const line = sites.find((x) => x.site.id === fl.siteId)?.site.cauce_geojson as unknown as
       GeoJSON.LineString | undefined;
-    if (!line) return;
-    const coords = line.coordinates as [number, number][];
-    const c = coords[Math.floor(coords.length * 0.35)];
-    const prev = coords[Math.max(0, Math.floor(coords.length * 0.35) - 3)];
-    const bearing = (Math.atan2(c[0] - prev[0], c[1] - prev[1]) * 180) / Math.PI;
-    map.flyTo({ center: c, zoom: 11.6, pitch: 60, bearing, duration: 4000, essential: true });
+    const coords = (line?.coordinates ?? []) as [number, number][];
+    if (coords.length < 2) return;
+    // se centra un poco aguas arriba del frente: el frente queda a la derecha y se ve la crecida que deja atrás
+    const p = pointAlong(coords, Math.min(1, Math.max(0, fl.fraction - 0.025)));
+    // el tablero del simulacro tapa la izquierda (escritorio) o la franja de arriba (celular):
+    // el frente se centra en la parte visible del mapa
+    // el tablero se muestra sobre el mapa desde 640 px de pantalla (sm), en la esquina izquierda
+    const w = map.getContainer().clientWidth;
+    const hud = window.innerWidth >= 640;
+    const padding = hud
+      ? { left: Math.min(330, w * 0.55), top: 20, right: 20, bottom: 70 }
+      : { left: 0, top: 50, right: 0, bottom: 40 };
+    map.easeTo({ center: p, zoom: 12.9, pitch: 58, padding, duration: 2200, essential: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, floodOn, sceneSite]);
+  }, [ready, frontKey]);
 
   // Vuelos programáticos
   useEffect(() => {
