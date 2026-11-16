@@ -4,8 +4,23 @@
  * Todo queda en geriam.notifications y geriam.audit_log.
  */
 import type { AlertLevel } from "../domain/types";
-import { dueEscalation, planNotifications, type AlertDraft, type EvalResult, type PolicyStep } from "../alerts/engine";
-import { audit, policySteps, recipients, toOpenAlert, type Admin, type AlertRow, type OrgBundle, type SiteRow } from "./repo";
+import {
+  dueEscalation,
+  planNotifications,
+  type AlertDraft,
+  type EvalResult,
+  type PolicyStep,
+} from "../alerts/engine";
+import {
+  audit,
+  policySteps,
+  recipients,
+  toOpenAlert,
+  type Admin,
+  type AlertRow,
+  type OrgBundle,
+  type SiteRow,
+} from "./repo";
 
 const LEVEL_UP: Record<string, string> = { amarilla: "AMARILLA", naranja: "NARANJA", roja: "ROJA" };
 
@@ -27,14 +42,25 @@ function etaLine(d: { eta: { name: string; minutes: number }[] }) {
 export async function insertNotifications(
   sb: Admin,
   b: OrgBundle,
-  alert: { id: string; level: string; title: string; description: string | null; zone_ids: string[]; eta: unknown },
+  alert: {
+    id: string;
+    level: string;
+    title: string;
+    description: string | null;
+    zone_ids: string[];
+    eta: unknown;
+  },
   step: PolicyStep,
   opts: ApplyOptions,
+  /** texto propio (p. ej. recordatorio de llegada) en lugar del armado desde la alerta */
+  text?: { title: string; body: string },
 ) {
   const planned = planNotifications(step, alert.zone_ids, recipients(b));
   if (!planned.length) return 0;
   const prefix = opts.drillRunId ? "[SIMULACRO] " : "";
-  const eta = Array.isArray(alert.eta) ? etaLine({ eta: alert.eta as { name: string; minutes: number }[] }) : "";
+  const eta = Array.isArray(alert.eta)
+    ? etaLine({ eta: alert.eta as { name: string; minutes: number }[] })
+    : "";
   const rows = planned.map((p) => ({
     organization_id: b.org.id,
     alert_id: alert.id,
@@ -44,9 +70,16 @@ export async function insertNotifications(
     recipient_name: p.name,
     provider: p.channel === "push" ? "web-push" : "twilio",
     status: "pendiente",
-    title: `${prefix}Alerta ${LEVEL_UP[alert.level] ?? alert.level} · ${alert.title}`,
-    body: `${alert.description ?? ""}${eta}`.trim(),
-    payload: { url: `/app/alertas/${alert.id}`, level: alert.level, alert_id: alert.id, drill: !!opts.drillRunId } as never,
+    title: text
+      ? `${prefix}${text.title}`
+      : `${prefix}Alerta ${LEVEL_UP[alert.level] ?? alert.level} · ${alert.title}`,
+    body: text ? text.body : `${alert.description ?? ""}${eta}`.trim(),
+    payload: {
+      url: `/app/alertas/${alert.id}`,
+      level: alert.level,
+      alert_id: alert.id,
+      drill: !!opts.drillRunId,
+    } as never,
     escalation_step: step.step,
     drill_run_id: opts.drillRunId ?? null,
   }));
@@ -55,15 +88,25 @@ export async function insertNotifications(
   return rows.length;
 }
 
-async function createOrUpdate(sb: Admin, b: OrgBundle, site: SiteRow, d: AlertDraft, opts: ApplyOptions): Promise<void> {
+async function createOrUpdate(
+  sb: Admin,
+  b: OrgBundle,
+  site: SiteRow,
+  d: AlertDraft,
+  opts: ApplyOptions,
+): Promise<void> {
   const nowIso = new Date(opts.now).toISOString();
   const realNow = new Date().toISOString();
   const policies = policySteps(b);
   if (d.existing) {
     // conservar el minuto simulado de inicio: la cuenta regresiva parte del primer disparo
     const keepStart = d.existing.simStartedMin ?? opts.simMinutes;
-    const tvKeep = keepStart !== undefined ? { ...d.triggerValues, sim_started_min: keepStart } : d.triggerValues;
-    const patch: Partial<AlertRow> = { last_triggered_at: opts.drillRunId ? realNow : nowIso, trigger_values: tvKeep as never };
+    const tvKeep =
+      keepStart !== undefined ? { ...d.triggerValues, sim_started_min: keepStart } : d.triggerValues;
+    const patch: Partial<AlertRow> = {
+      last_triggered_at: opts.drillRunId ? realNow : nowIso,
+      trigger_values: tvKeep as never,
+    };
     if (d.notify) {
       patch.level = d.level;
       patch.title = d.title;
@@ -77,13 +120,25 @@ async function createOrUpdate(sb: Admin, b: OrgBundle, site: SiteRow, d: AlertDr
     const r = await sb.from("alerts").update(patch).eq("id", d.existing.id).select("*").single();
     if (r.error) throw new Error(`alert update: ${r.error.message}`);
     if (d.notify) {
-      await audit(sb, b.org.id, "alerta.nivel_elevado", "alert", d.existing.id, { level: d.level, from: d.existing.level, title: d.title }, undefined, opts.drillRunId);
+      await audit(
+        sb,
+        b.org.id,
+        "alerta.nivel_elevado",
+        "alert",
+        d.existing.id,
+        { level: d.level, from: d.existing.level, title: d.title },
+        undefined,
+        opts.drillRunId,
+      );
       const step0 = policies.find((p) => p.level === d.level && p.step === 0);
       if (step0) await insertNotifications(sb, b, r.data, step0, opts);
     }
     return;
   }
-  const tv = opts.simMinutes !== undefined ? { ...d.triggerValues, sim_started_min: opts.simMinutes } : d.triggerValues;
+  const tv =
+    opts.simMinutes !== undefined
+      ? { ...d.triggerValues, sim_started_min: opts.simMinutes }
+      : d.triggerValues;
   const ins = await sb
     .from("alerts")
     .insert({
@@ -111,12 +166,27 @@ async function createOrUpdate(sb: Admin, b: OrgBundle, site: SiteRow, d: AlertDr
     if (/duplicate|unique/i.test(ins.error.message)) return;
     throw new Error(`alert insert: ${ins.error.message}`);
   }
-  await audit(sb, b.org.id, "alerta.creada", "alert", ins.data.id, { level: d.level, type: d.type, title: d.title, site: site.code }, undefined, opts.drillRunId);
+  await audit(
+    sb,
+    b.org.id,
+    "alerta.creada",
+    "alert",
+    ins.data.id,
+    { level: d.level, type: d.type, title: d.title, site: site.code },
+    undefined,
+    opts.drillRunId,
+  );
   const step0 = policies.find((p) => p.level === d.level && p.step === 0);
   if (step0) await insertNotifications(sb, b, ins.data, step0, opts);
 }
 
-export async function applyEvaluation(sb: Admin, b: OrgBundle, site: SiteRow, result: EvalResult, opts: ApplyOptions) {
+export async function applyEvaluation(
+  sb: Admin,
+  b: OrgBundle,
+  site: SiteRow,
+  result: EvalResult,
+  opts: ApplyOptions,
+) {
   for (const d of result.drafts) await createOrUpdate(sb, b, site, d, opts);
   for (const { alert, reason } of result.resolve) {
     const r = await sb
@@ -125,20 +195,41 @@ export async function applyEvaluation(sb: Admin, b: OrgBundle, site: SiteRow, re
       .eq("id", alert.id)
       .neq("status", "resuelta");
     if (r.error) throw new Error(`alert resolve: ${r.error.message}`);
-    await audit(sb, b.org.id, "alerta.resuelta", "alert", alert.id, { reason, automatic: true }, undefined, opts.drillRunId);
+    await audit(
+      sb,
+      b.org.id,
+      "alerta.resuelta",
+      "alert",
+      alert.id,
+      { reason, automatic: true },
+      undefined,
+      opts.drillRunId,
+    );
   }
 }
 
 /** Escala alertas no confirmadas según la política (minutos sin confirmar → siguiente paso). */
-export async function runEscalations(sb: Admin, b: OrgBundle, openAlerts: AlertRow[], opts: ApplyOptions & { simStartMs?: number }) {
+export async function runEscalations(
+  sb: Admin,
+  b: OrgBundle,
+  openAlerts: AlertRow[],
+  opts: ApplyOptions & { simStartMs?: number },
+) {
   const policies = policySteps(b);
   let n = 0;
   for (const a of openAlerts) {
     if ((a.drill_run_id ?? null) !== (opts.drillRunId ?? null)) continue;
+    // los avisos de llegada tienen su propio recordatorio (15 min antes), no se escalan
+    if (a.type === "llegada") continue;
     let startedAt = new Date(a.started_at).getTime();
     const tv = (a.trigger_values ?? {}) as { sim_started_min?: number };
-    if (opts.drillRunId && opts.simStartMs !== undefined && tv.sim_started_min !== undefined) startedAt = opts.simStartMs + tv.sim_started_min * 60_000;
-    const step = dueEscalation({ level: a.level as AlertLevel, status: a.status, startedAt, escalationStep: a.escalation_step }, policies, opts.now);
+    if (opts.drillRunId && opts.simStartMs !== undefined && tv.sim_started_min !== undefined)
+      startedAt = opts.simStartMs + tv.sim_started_min * 60_000;
+    const step = dueEscalation(
+      { level: a.level as AlertLevel, status: a.status, startedAt, escalationStep: a.escalation_step },
+      policies,
+      opts.now,
+    );
     if (!step) continue;
     const r = await sb
       .from("alerts")
@@ -148,7 +239,16 @@ export async function runEscalations(sb: Admin, b: OrgBundle, openAlerts: AlertR
       .select("*")
       .maybeSingle();
     if (r.error || !r.data) continue;
-    await audit(sb, b.org.id, "alerta.escalada", "alert", a.id, { step: step.step, roles: step.roles, channels: step.channels, after_min: step.afterMin }, undefined, opts.drillRunId);
+    await audit(
+      sb,
+      b.org.id,
+      "alerta.escalada",
+      "alert",
+      a.id,
+      { step: step.step, roles: step.roles, channels: step.channels, after_min: step.afterMin },
+      undefined,
+      opts.drillRunId,
+    );
     await insertNotifications(sb, b, r.data, step, opts);
     n++;
   }

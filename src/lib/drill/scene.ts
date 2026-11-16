@@ -192,7 +192,13 @@ export function drillScene(data: OrgLive | undefined, now: number): DrillScene |
   const ph = def?.at(Math.min(simMin, def.durationMin));
 
   const alerts = data.alerts.filter((a) => a.drill_run_id === drill.id && a.status !== "resuelta");
-  const top = alerts.reduce<Alert | null>((m, a) => (!m || RANK[a.level] > RANK[m.level] ? a : m), null);
+  // la más grave; entre iguales, el aviso de llegada más próximo (lo que la persona debe atender primero)
+  const arrivalAt = (a: Alert) => {
+    const tv = (a.trigger_values ?? {}) as { sim_started_min?: number };
+    return (tv.sim_started_min ?? 0) + (alertEta(a)[0]?.minutes ?? 0);
+  };
+  const score = (a: Alert) => (RANK[a.level] ?? 0) * 1e6 + (a.type === "llegada" ? 1e5 - arrivalAt(a) : 0);
+  const top = alerts.reduce<Alert | null>((m, a) => (!m || score(a) > score(m) ? a : m), null);
   const level = (top?.level ?? "normal") as DrillScene["level"];
 
   // Frente de crecida: la alerta más grave que tenga tiempos de llegada aguas abajo

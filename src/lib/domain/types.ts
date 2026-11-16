@@ -27,7 +27,7 @@ export type DataSource = "simulado" | "lorawan" | "scada" | "api";
 
 export type AlertStatus = "activa" | "confirmada" | "escalada" | "resuelta";
 
-export type AlertType = "umbral" | "tasa" | "combinada" | "estructural" | "comunicacion" | "manual";
+export type AlertType = "umbral" | "tasa" | "combinada" | "estructural" | "comunicacion" | "manual" | "llegada";
 
 export type Channel = "push" | "sms" | "whatsapp" | "email" | "demo";
 

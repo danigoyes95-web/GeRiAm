@@ -6,7 +6,7 @@
 import { evaluate, type OpenAlert } from "../alerts/engine";
 import { stepSite, type SiteState } from "../sim/physics";
 import { emitReadings } from "../sim/telemetry";
-import { ROTURA_STAGGER, SCENARIOS, type ScenarioId } from "../sim/scenarios";
+import { ROTURA_BREACH_AT, ROTURA_STAGGER, SCENARIOS, type ScenarioId } from "../sim/scenarios";
 import { DEBRIS, type Debris } from "../flood/impact";
 import { volumeAt } from "../hydro/curve";
 import {
@@ -23,7 +23,8 @@ import {
   type Admin,
   type OrgBundle,
 } from "./repo";
-import { applyEvaluation, runEscalations } from "./alerts";
+import { applyEvaluation, insertNotifications, runEscalations } from "./alerts";
+import type { PolicyStep } from "../alerts/engine";
 import { insertReadings, readingRows, stateFor } from "./tick";
 
 const HIST_TYPES = new Set(["nivel_radar", "piezometro", "asentamiento", "pluviometro", "inclinometro"]);
@@ -52,6 +53,10 @@ export interface DrillState extends SiteDrill {
   extra?: Record<string, SiteDrill>;
   /** rotura: lo que arrastra la crecida (agua, escombros o lodo) */
   debris?: Debris;
+  /** rotura: presas cuya brecha ya se avisó a los puntos de control */
+  announced?: string[];
+  /** rotura: aviso de llegada por punto de control (id del punto → estado) */
+  arrivals?: Record<string, ArrivalWarn>;
   /** embalses del simulacro sin su estado físico (lo lee el cliente: la columna snapshot no se le envía) */
   sites?: { id: string; code: string; role: DrillSnapshotSite["role"]; offset_min: number }[];
 }
@@ -72,6 +77,173 @@ export function drillSiteIds(drill: { site_id: string; snapshot?: unknown } | nu
 }
 
 const prefixOf = (drillId: string) => `D${drillId.slice(0, 8)}:`;
+
+interface ArrivalWarn {
+  alertId: string | null;
+  /** minuto del escenario en que llega el frente */
+  atMin: number;
+  breachAtMin: number;
+  from: string;
+  reminded?: boolean;
+  arrived?: boolean;
+}
+
+const fmtMin = (m: number) => {
+  const v = Math.max(0, Math.round(m));
+  const h = Math.floor(v / 60);
+  return h ? `${h} h ${v % 60} min` : `${v} min`;
+};
+
+/** Aviso a la zona del punto (junta y técnicos, todos los canales) y a la sala (push). */
+const ARRIVAL_ZONE: PolicyStep = {
+  level: "roja",
+  step: 0,
+  afterMin: 0,
+  roles: ["director_junta", "tecnico"],
+  channels: ["push", "sms", "whatsapp"],
+};
+const ARRIVAL_ROOM: PolicyStep = {
+  level: "roja",
+  step: 0,
+  afterMin: 0,
+  roles: ["operador"],
+  channels: ["push"],
+};
+const REMIND_BEFORE_MIN = 15;
+
+/**
+ * Rotura: al abrirse la brecha de cada presa, una alerta roja por punto de control con SU tiempo de llegada
+ * (dirigida a la zona del punto), un recordatorio 15 min antes de la llegada y la marca de llegada.
+ * Si la onda de otra presa llega antes a un punto, su aviso se actualiza con la hora más temprana.
+ */
+async function arrivalWarnings(
+  sb: Admin,
+  b: OrgBundle,
+  drill: NonNullable<OrgBundle["drill"]>,
+  st: DrillState,
+  entries: { site: OrgBundle["sites"][number]; sd: SiteDrill }[],
+  simMin: number,
+  opts: { now: number; drillRunId: string; simMinutes: number },
+) {
+  st.arrivals ??= {};
+  st.announced ??= [];
+  const prefix = prefixOf(drill.id);
+  for (const e of entries) {
+    if (e.sd.passive) continue;
+    const breachAt = ROTURA_BREACH_AT + (e.sd.offsetMin ?? 0);
+    if (simMin < breachAt || st.announced.includes(e.site.id)) continue;
+    st.announced.push(e.site.id);
+    const dam = e.site.name.replace("Embalse ", "");
+    let sent = 0;
+    for (const r of b.routes.filter((x) => x.site_id === e.site.id)) {
+      const p = b.points.find((x) => x.id === r.point_id);
+      if (!p) continue;
+      const atMin = breachAt + r.tiempo_llegada_min;
+      const cur = st.arrivals[p.id];
+      if (cur && cur.atMin <= atMin) continue; // ya avisado con una onda que llega antes
+      const pob = p.poblacion_expuesta
+        ? ` (${p.poblacion_expuesta.toLocaleString("es-EC")} hab. expuestos)`
+        : "";
+      const description = `Rotura de la presa ${dam}. Tiempo de llegada de la onda a ${p.name}: ${fmtMin(r.tiempo_llegada_min)} desde la rotura${pob}. Evacúe ya hacia zonas altas por las rutas acordadas y aléjese del cauce.`;
+      const eta = [
+        { point_id: p.id, name: p.name, minutes: r.tiempo_llegada_min, poblacion: p.poblacion_expuesta },
+      ];
+      const tv = { sim_started_min: breachAt, point_id: p.id };
+      if (cur?.alertId) {
+        await sb
+          .from("alerts")
+          .update({
+            description,
+            eta: eta as never,
+            eta_primary_min: r.tiempo_llegada_min,
+            trigger_values: tv as never,
+          })
+          .eq("id", cur.alertId);
+        st.arrivals[p.id] = { ...cur, atMin, breachAtMin: breachAt, from: dam, reminded: false };
+        continue;
+      }
+      const nowIso = new Date().toISOString();
+      const ins = await sb
+        .from("alerts")
+        .insert({
+          organization_id: b.org.id,
+          site_id: e.site.id,
+          sensor_id: null,
+          rule_id: null,
+          level: "roja",
+          type: "llegada",
+          title: `Onda de rotura hacia ${p.name}`,
+          description,
+          trigger_values: tv as never,
+          eta: eta as never,
+          eta_primary_min: r.tiempo_llegada_min,
+          zone_ids: p.zone_id ? [p.zone_id] : [],
+          dedupe_key: `${prefix}LLEGADA:${p.id}`,
+          drill_run_id: drill.id,
+          started_at: nowIso,
+          last_triggered_at: nowIso,
+        })
+        .select("*")
+        .single();
+      if (ins.error) {
+        if (/duplicate|unique/i.test(ins.error.message)) continue;
+        throw new Error(`aviso de llegada: ${ins.error.message}`);
+      }
+      st.arrivals[p.id] = { alertId: ins.data.id, atMin, breachAtMin: breachAt, from: dam };
+      await audit(
+        sb,
+        b.org.id,
+        "alerta.creada",
+        "alert",
+        ins.data.id,
+        { level: "roja", type: "llegada", punto: p.name, llegada_min: Math.round(atMin - simMin) },
+        undefined,
+        drill.id,
+      );
+      await insertNotifications(sb, b, ins.data, ARRIVAL_ZONE, opts);
+      await insertNotifications(sb, b, ins.data, ARRIVAL_ROOM, opts);
+      sent++;
+    }
+    if (sent)
+      st.events.push({
+        min: Math.round(simMin),
+        label: `Aviso de llegada enviado a ${sent} puntos de control (rotura de ${dam})`,
+      });
+  }
+  for (const [pid, w] of Object.entries(st.arrivals)) {
+    const p = b.points.find((x) => x.id === pid);
+    if (!w.alertId || !p) continue;
+    if (
+      !w.reminded &&
+      w.atMin - w.breachAtMin > REMIND_BEFORE_MIN &&
+      simMin >= w.atMin - REMIND_BEFORE_MIN &&
+      simMin < w.atMin
+    ) {
+      w.reminded = true;
+      const a = await sb.from("alerts").select("*").eq("id", w.alertId).maybeSingle();
+      if (a.data) {
+        const text = {
+          title: `Recordatorio · ${fmtMin(w.atMin - simMin)} para la llegada a ${p.name}`,
+          body: `La onda de rotura (${w.from}) llega a ${p.name} en ${fmtMin(w.atMin - simMin)}. Si aún no evacuó, hágalo ahora hacia zonas altas.`,
+        };
+        await insertNotifications(sb, b, a.data, ARRIVAL_ZONE, opts, text);
+        await insertNotifications(sb, b, a.data, ARRIVAL_ROOM, opts, text);
+      }
+      st.events.push({
+        min: Math.round(simMin),
+        label: `Recordatorio: ${fmtMin(w.atMin - simMin)} para la llegada a ${p.name}`,
+      });
+    }
+    if (!w.arrived && simMin >= w.atMin) {
+      w.arrived = true;
+      await sb
+        .from("alerts")
+        .update({ title: `Crecida en ${p.name}` })
+        .eq("id", w.alertId);
+      st.events.push({ min: Math.round(w.atMin), label: `La onda llegó a ${p.name}` });
+    }
+  }
+}
 
 async function siteDrillFor(
   sb: Admin,
@@ -388,6 +560,12 @@ async function advance(sb: Admin, b: OrgBundle, drill: NonNullable<OrgBundle["dr
       simMinutes: Math.round(simMin),
     });
   }
+  if (drill.scenario === "rotura")
+    await arrivalWarnings(sb, b, drill, st, entries, simMin, {
+      now: simNow,
+      drillRunId: drill.id,
+      simMinutes: Math.round(simMin),
+    });
   await runEscalations(sb, b, openRows, { now: simNow, drillRunId: drill.id, simStartMs: st.startT });
 
   const done = simMin >= def.durationMin;

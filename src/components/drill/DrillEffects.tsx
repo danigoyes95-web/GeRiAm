@@ -9,6 +9,7 @@ import { useNow } from "@/lib/hooks/useNow";
 import { formatNumber } from "@/lib/format";
 import { SCENARIO_LABEL } from "@/components/DrillBanner";
 import { cn } from "@/lib/utils";
+import { alertEta } from "@/lib/data/types";
 
 const RANK: Record<string, number> = { normal: 0, amarilla: 1, naranja: 2, roja: 3 };
 const LABEL: Record<string, string> = {
@@ -82,7 +83,12 @@ export function DrillEffects() {
   }, [show, rank, scene?.drillId]);
 
   if (!scene) return null;
-  const ambato = scene.etas.find((e) => /ambato/i.test(e.name)) ?? scene.etas[scene.etas.length - 1];
+  // un aviso de llegada muestra la cuenta regresiva de SU punto; si no, la de Ambato
+  const own = scene.topAlert?.type === "llegada" ? alertEta(scene.topAlert)[0]?.name : undefined;
+  const target =
+    (own && scene.etas.find((e) => e.name === own)) ??
+    scene.etas.find((e) => /ambato/i.test(e.name)) ??
+    scene.etas[scene.etas.length - 1];
 
   return (
     <>
@@ -110,12 +116,17 @@ export function DrillEffects() {
             <p className="mt-2 text-base font-medium text-white/90">
               {scene.topAlert?.title ?? scene.siteName}
             </p>
-            {ambato && (
+            {target && (
               <div className="mt-5 rounded-xl border border-white/25 bg-black/35 px-5 py-3 backdrop-blur">
                 <div className="text-[11px] font-semibold tracking-widest text-white/70 uppercase">
-                  La crecida llegaría a {ambato.name} en
+                  {target.remainingMin <= 0
+                    ? `La onda ya llegó a ${target.name}`
+                    : `La onda llega a ${target.name} en`}
                 </div>
-                <div className="tabular font-mono text-3xl font-bold">{fmtMin(ambato.remainingMin)}</div>
+                {target.remainingMin > 0 && (
+                  <div className="tabular font-mono text-3xl font-bold">{fmtMin(target.remainingMin)}</div>
+                )}
+                {own && <div className="mt-1 text-xs text-white/80">Evacúe hacia zonas altas</div>}
               </div>
             )}
             <p className="mt-5 text-xs text-white/60">Toque para continuar</p>
