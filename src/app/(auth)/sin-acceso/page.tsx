@@ -17,11 +17,11 @@ export default async function SinAccesoPage({ searchParams }: { searchParams: Pr
         <span className="mx-auto grid size-12 place-items-center rounded-full border border-lvl-naranja/40 bg-[var(--lvl-naranja-bg)] text-lvl-naranja">
           <ShieldAlert className="size-6" aria-hidden />
         </span>
-        <h1 className="mt-4 text-lg font-semibold">Sin acceso a GeRiAm</h1>
+        <h1 className="mt-4 text-lg font-semibold">Sin acceso al sistema</h1>
         <p className="mt-2 text-sm text-fg-muted">
           {motivo === "rol"
             ? "Su rol no tiene permiso para esta sección."
-            : "Su cuenta existe, pero no está habilitada en GeRiAm. Solicite el alta a la administración de la plataforma."}
+            : "Su cuenta existe, pero no está habilitada en el Sistema de Alerta Temprana. Solicite el alta a la administración de la plataforma."}
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <Button asChild variant="secondary">

@@ -14,6 +14,7 @@ import type { AlertLevel } from "@/lib/domain/types";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import { useNow } from "@/lib/hooks/useNow";
+import { APP_NAME } from "@/lib/brand";
 
 type Period = "24" | "168" | "720";
 const PERIOD_LABEL: Record<Period, string> = {
@@ -384,7 +385,7 @@ export function ReportBuilder() {
           </section>
 
           <footer className="mt-6 border-t border-zinc-200 pt-2 text-[10px] text-zinc-500">
-            GeRiAm · Gestión de Riesgos Ambato. Datos de demostración generados por el simulador calibrado con
+            {APP_NAME}. Datos de demostración generados por el simulador calibrado con
             la climatología de las estaciones HGPT (2013–2025); no corresponden a mediciones reales de la
             presa.
           </footer>

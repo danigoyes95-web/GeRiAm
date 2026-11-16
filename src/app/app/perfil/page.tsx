@@ -10,6 +10,7 @@ import { getBrowserClient } from "@/lib/supabase/browser";
 import { currentSubscription, disablePush, enablePush, pushSupport, type PushSupport } from "@/lib/push/client";
 import { ROLE_LABEL } from "@/lib/domain/types";
 import { cn } from "@/lib/utils";
+import { APP_SHORT_NAME } from "@/lib/brand";
 
 const CHANNELS = [
   { id: "push", label: "Notificación push" },
@@ -116,7 +117,7 @@ export default function PerfilPage() {
             <ol className="mt-2 space-y-2 text-fg-muted">
               <li className="flex gap-2"><Share className="size-4 shrink-0 text-accent" /> Toque <b className="text-fg">Compartir</b> en la barra de Safari.</li>
               <li className="flex gap-2"><SquarePlus className="size-4 shrink-0 text-accent" /> Elija <b className="text-fg">“Añadir a pantalla de inicio”</b>.</li>
-              <li className="flex gap-2"><Smartphone className="size-4 shrink-0 text-accent" /> Abra <b className="text-fg">GeRiAm</b> desde el ícono y vuelva a esta pantalla.</li>
+              <li className="flex gap-2"><Smartphone className="size-4 shrink-0 text-accent" /> Abra <b className="text-fg">{APP_SHORT_NAME}</b> desde el ícono y vuelva a esta pantalla.</li>
             </ol>
             <p className="mt-2 text-xs text-fg-faint">Requiere iOS 16.4 o superior.</p>
           </div>

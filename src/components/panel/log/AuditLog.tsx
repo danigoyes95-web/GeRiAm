@@ -33,6 +33,10 @@ import type { AuditEntry } from "@/lib/data/types";
 import type { AlertLevel } from "@/lib/domain/types";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { LEGACY_SYSTEM_ACTORS, SYSTEM_ACTOR } from "@/lib/brand";
+
+const isSystemActor = (a: string | null | undefined) => !a || a === SYSTEM_ACTOR || LEGACY_SYSTEM_ACTORS.includes(a);
+const actorLabel = (a: string | null | undefined) => (isSystemActor(a) ? SYSTEM_ACTOR : a!);
 
 type Cat = "todas" | "alerta" | "simulacro" | "incidente" | "notificacion";
 type Origin = "todos" | "real" | "simulacro";
@@ -112,7 +116,7 @@ function toCsv(rows: AuditEntry[]) {
   const head = ["fecha_hora", "origen", "accion", "descripcion", "detalle", "responsable"];
   const lines = rows.map((e) => {
     const x = describe(e);
-    return [formatDateTime(e.created_at, undefined, true), e.drill_run_id ? "simulacro" : "real", e.action, x.title, x.detail ?? "", e.actor_name ?? "Sistema GeRiAm"].map(esc).join(";");
+    return [formatDateTime(e.created_at, undefined, true), e.drill_run_id ? "simulacro" : "real", e.action, x.title, x.detail ?? "", actorLabel(e.actor_name)].map(esc).join(";");
   });
   return "﻿" + [head.join(";"), ...lines].join("\r\n");
 }
@@ -163,7 +167,7 @@ export function AuditLog() {
     for (const e of rows) {
       const k = formatDate(e.created_at);
       const x = describe(e);
-      const actor = e.actor_name && e.actor_name !== "Sistema GeRiAm" ? e.actor_name : "Sistema GeRiAm (automático)";
+      const actor = isSystemActor(e.actor_name) ? `${SYSTEM_ACTOR} (automático)` : e.actor_name!;
       m.set(k, [
         ...(m.get(k) ?? []),
         {

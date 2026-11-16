@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
+import { APP_NAME, APP_SHORT_NAME } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/app",
-    name: "GeRiAm — Alerta temprana de embalses",
-    short_name: "GeRiAm",
+    name: APP_NAME,
+    short_name: APP_SHORT_NAME,
     description: "Estado de embalses, alertas, cámaras y reportes de campo.",
     start_url: "/app",
     scope: "/",

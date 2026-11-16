@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
+import { APP_NAME, APP_NAME_LINES } from "@/lib/brand";
 
 /**
- * Isotipo GeRiAm: gota con curvas de nivel topográficas y una onda de agua en la base.
+ * Isotipo del sistema: gota con curvas de nivel topográficas y una onda de agua en la base.
  * El color de acento es configurable por organización (branding.primary).
  */
 export function Isotipo({ className, color = "var(--accent)", title }: { className?: string; color?: string; title?: string }) {
@@ -37,7 +38,7 @@ export function Isotipo({ className, color = "var(--accent)", title }: { classNa
 
 export function Logo({
   className,
-  product = "GeRiAm",
+  product = APP_NAME,
   tagline,
   color,
   compact = false,
@@ -48,22 +49,28 @@ export function Logo({
   color?: string;
   compact?: boolean;
 }) {
-  const head = product.slice(0, 2);
-  const mid = product.slice(2, 4);
-  const tail = product.slice(4);
+  const official = product === APP_NAME;
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <Isotipo color={color} title={product} />
-      {!compact && (
-        <span className="flex flex-col leading-none">
-          <span className="text-[17px] font-semibold tracking-[-0.02em] text-fg">
-            {head}
-            <span className="text-accent">{mid}</span>
-            {tail}
+      {!compact &&
+        (official ? (
+          // Sistema de / Alerta Temprana / Embalses Tungurahua: el nombre completo, de arriba abajo
+          <span className="flex flex-col leading-none">
+            <span className="text-fg-faint text-[9px] font-medium uppercase tracking-[0.16em]">{APP_NAME_LINES.pre}</span>
+            <span className="text-fg mt-[3px] text-[16px] font-semibold tracking-[-0.02em] whitespace-nowrap">
+              {APP_NAME_LINES.main[0]} <span className="text-accent">{APP_NAME_LINES.main[1]}</span>
+            </span>
+            <span className="text-fg-muted mt-[3px] text-[9px] font-semibold uppercase tracking-[0.13em] whitespace-nowrap">
+              {APP_NAME_LINES.post}
+            </span>
           </span>
-          {tagline ? <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-fg-faint">{tagline}</span> : null}
-        </span>
-      )}
+        ) : (
+          <span className="flex flex-col leading-none">
+            <span className="text-fg text-[17px] font-semibold tracking-[-0.02em]">{product}</span>
+            {tagline ? <span className="text-fg-faint mt-1 text-[10px] font-medium uppercase tracking-[0.14em]">{tagline}</span> : null}
+          </span>
+        ))}
     </span>
   );
 }

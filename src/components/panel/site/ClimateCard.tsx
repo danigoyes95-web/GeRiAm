@@ -79,7 +79,7 @@ export function ClimateCard({ clima }: { clima: ClimaView }) {
           ))}
         </dl>
         <p className="text-[10.5px] leading-relaxed text-fg-faint">
-          El simulador de GeRiAm genera la lluvia con estas estadísticas (frecuencia, duración e intensidad de eventos y estacionalidad), calculadas con los registros horarios y de 1 minuto de la red hidrometeorológica del Gobierno Provincial.
+          El simulador del sistema genera la lluvia con estas estadísticas (frecuencia, duración e intensidad de eventos y estacionalidad), calculadas con los registros horarios y de 1 minuto de la red hidrometeorológica del Gobierno Provincial.
         </p>
       </CardBody>
     </Card>

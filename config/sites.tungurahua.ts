@@ -85,14 +85,13 @@ export const ORGANIZATION = {
   timezone: "America/Guayaquil",
   map_center: { lng: -78.792, lat: -1.276, zoom: 11.9, pitch: 60, bearing: -20 },
   branding: {
-    product: "GeRiAm",
-    tagline: "Gestión de Riesgos Ambato",
+    product: "Sistema de Alerta Temprana Embalses Tungurahua",
     entity: "Gobierno Provincial de Tungurahua",
     unit: "Dirección de Recursos Hídricos y Gestión de Riesgos",
     primary: "#22d3ee",
     contacts: [
       { name: "ECU 911 — Emergencias", phone: "911", kind: "emergencia" },
-      { name: "Sala de operaciones GeRiAm", phone: "Por configurar", kind: "sala" },
+      { name: "Sala de operaciones — Alerta Temprana", phone: "Por configurar", kind: "sala" },
       { name: "Unidad de Gestión de Riesgos — GPT", phone: "Por configurar", kind: "institucional" },
     ],
   },

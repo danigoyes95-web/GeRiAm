@@ -8,6 +8,7 @@ import { DrillBanner } from "@/components/DrillBanner";
 import { DrillEffects, DrillPrologue } from "@/components/drill/DrillEffects";
 import { OnlineIndicator } from "./OnlineIndicator";
 import { useOrgLive } from "@/lib/data/live";
+import { APP_NAME, APP_NAME_LINES } from "@/lib/brand";
 
 const TABS = [
   { href: "/app", label: "Inicio", icon: Home },
@@ -38,8 +39,9 @@ export function AppShell({
       <header className="border-border bg-bg/85 sticky top-0 z-30 flex items-center gap-3 border-b px-4 pt-[max(env(safe-area-inset-top),0.5rem)] pb-2 backdrop-blur-md">
         <Isotipo className="size-7" />
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="text-[15px] font-semibold tracking-tight">
-            Ge<span className="text-accent">Ri</span>Am
+          <div className="truncate text-[15px] font-semibold tracking-tight" title={APP_NAME}>
+            {APP_NAME_LINES.main[0]} <span className="text-accent">{APP_NAME_LINES.main[1]}</span>{" "}
+            <span className="text-fg-muted text-[9.5px] font-semibold tracking-[0.1em] uppercase">{APP_NAME_LINES.post}</span>
           </div>
           <div className="text-fg-faint truncate text-[11px]">
             {userName} · {roleLabel}
