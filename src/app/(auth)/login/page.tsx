@@ -16,7 +16,7 @@ export default function LoginPage() {
         <TopoBackground className="absolute inset-0 size-full opacity-60" />
         <div className="relative flex h-full flex-col justify-between p-12">
           <Link href="/" className="w-fit" aria-label="Volver al portal">
-            <Logo tagline="Gestión de Riesgos Ambato" />
+            <Logo />
           </Link>
           <div className="max-w-md">
             <p className="label-caps mb-3 text-accent">Sala de operaciones</p>
@@ -37,9 +37,9 @@ export default function LoginPage() {
       <section className="flex items-center justify-center px-4 py-10 sm:px-8">
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden">
-            <Logo tagline="Gestión de Riesgos Ambato" />
+            <Logo />
           </div>
-          <h2 className="text-xl font-semibold tracking-tight">Ingresar a GeRiAm</h2>
+          <h2 className="text-xl font-semibold tracking-tight">Ingresar al sistema</h2>
           <p className="mt-1 text-sm text-fg-muted">Use su correo institucional.</p>
           <Suspense>
             <LoginForm demoMode={DEMO_MODE} />

@@ -9,6 +9,7 @@ import type { EvalRule, EvalSensor, OpenAlert, PolicyStep, Recipient, Route } fr
 import type { SimSensor } from "../sim/telemetry";
 import type { DownstreamStation } from "../sim/physics";
 import { siteParamsFromRow } from "../sim/params";
+import { SYSTEM_ACTOR } from "@/lib/brand";
 
 export type Admin = SupabaseClient<DB, GeriamSchema>;
 export type SiteRow = Tables<"sites">;
@@ -232,7 +233,7 @@ export async function audit(
   await sb.from("audit_log").insert({
     organization_id: orgId,
     actor_id: actor?.id ?? null,
-    actor_name: actor?.name ?? "Sistema GeRiAm",
+    actor_name: actor?.name ?? SYSTEM_ACTOR,
     action,
     entity,
     entity_id: entityId,

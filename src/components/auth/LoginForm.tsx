@@ -64,7 +64,7 @@ export function LoginForm({ demoMode }: { demoMode: boolean }) {
         /invalid login/i.test(msg)
           ? "Correo o contraseña incorrectos."
           : /signups not allowed|not found/i.test(msg)
-            ? "Este correo no tiene acceso a GeRiAm."
+            ? "Este correo no tiene acceso al Sistema de Alerta Temprana."
             : "No se pudo iniciar sesión. Intente nuevamente.",
       );
     } finally {

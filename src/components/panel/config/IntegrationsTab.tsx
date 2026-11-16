@@ -148,7 +148,7 @@ export function IntegrationsTab() {
           <div className="text-fg-muted grid gap-3 text-xs leading-relaxed md:grid-cols-3">
             <p className="flex gap-2">
               <KeyRound className="text-accent mt-0.5 size-4 shrink-0" />
-              Cada integración tiene su propio token. GeRiAm guarda solo su huella (SHA-256): si se pierde, se
+              Cada integración tiene su propio token. El sistema guarda solo su huella (SHA-256): si se pierde, se
               crea otra y se desactiva la anterior.
             </p>
             <p className="flex gap-2">

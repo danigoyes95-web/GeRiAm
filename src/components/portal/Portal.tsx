@@ -29,6 +29,7 @@ import { formatAgo, formatDuration, formatHm3, formatNumber } from "@/lib/format
 import { ROLE_LABEL, worstLevel, type Role, type StatusLevel } from "@/lib/domain/types";
 import { useNow } from "@/lib/hooks/useNow";
 import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/lib/brand";
 
 const BasinMap = dynamic(() => import("@/components/map/BasinMap").then((m) => m.BasinMap), { ssr: false });
 
@@ -65,7 +66,7 @@ const FLOW: { icon: LucideIcon; title: string; text: string }[] = [
   { icon: RadioTower, title: "LoRaWAN", text: "Radio de largo alcance y bajo consumo: kilómetros de cobertura con baterías." },
   { icon: Mountain, title: "Gateway en la presa", text: "Concentra los sensores y las cámaras IP de cada embalse." },
   { icon: Satellite, title: "Starlink", text: "Enlace satelital en el páramo, donde no hay cobertura celular." },
-  { icon: Cloud, title: "Nube GeRiAm", text: "Reglas de alerta, histórico, simulacros y bitácora inmutable." },
+  { icon: Cloud, title: "Nube del sistema", text: "Reglas de alerta, histórico, simulacros y bitácora inmutable." },
   { icon: LayoutDashboard, title: "Panel y app", text: "Sala de operaciones y teléfonos de técnicos y juntas, en tiempo real." },
 ];
 
@@ -91,7 +92,7 @@ export function Portal({ initial }: { initial: PublicStatus | null }) {
       <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
           <Link href="/" aria-label="Inicio">
-            <Logo tagline={branding.tagline ?? "Gestión de Riesgos"} product={branding.product} color={branding.primary} />
+            <Logo product={branding.product} color={branding.primary} />
           </Link>
           <nav className="hidden items-center gap-6 text-[13px] text-fg-muted md:flex" aria-label="Secciones">
             <a href="#estado" className="hover:text-fg">Estado</a>
@@ -372,7 +373,7 @@ export function Portal({ initial }: { initial: PublicStatus | null }) {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-fg-faint">
           <span className="inline-flex items-center gap-2">
-            <Waves className="size-4" aria-hidden /> {branding.product ?? "GeRiAm"} · {entity}
+            <Waves className="size-4" aria-hidden /> {branding.product ?? APP_NAME} · {entity}
           </span>
           <span>{branding.unit ?? "Gestión de Riesgos"}</span>
         </div>

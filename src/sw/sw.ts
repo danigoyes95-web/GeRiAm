@@ -51,11 +51,11 @@ self.addEventListener("push", (event) => {
   try {
     data = (event.data?.json() ?? {}) as PushData;
   } catch {
-    data = { title: "GeRiAm", body: event.data?.text() ?? "" };
+    data = { title: "SAT Embalses", body: event.data?.text() ?? "" };
   }
   const critical = data.level === "roja" || data.level === "naranja";
   event.waitUntil(
-    self.registration.showNotification(data.title ?? "GeRiAm — Alerta", {
+    self.registration.showNotification(data.title ?? "SAT Embalses — Alerta", {
       body: data.body ?? "",
       icon: "/icons/icon-192.png",
       badge: "/icons/badge-72.png",

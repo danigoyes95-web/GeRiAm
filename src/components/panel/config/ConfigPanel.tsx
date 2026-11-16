@@ -22,6 +22,7 @@ import { getBrowserClient } from "@/lib/supabase/browser";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { IntegrationsTab } from "./IntegrationsTab";
+import { APP_NAME } from "@/lib/brand";
 
 type Tab = "umbrales" | "reglas" | "puntos" | "integraciones" | "escalamiento" | "usuarios" | "organizacion";
 const LV = ["amarilla", "naranja", "roja"] as const;
@@ -368,7 +369,7 @@ export function ConfigPanel() {
             {[
               ["Entidad", panel.branding.entity ?? panel.orgName],
               ["Unidad", panel.branding.unit ?? "—"],
-              ["Producto", `${panel.branding.product ?? "GeRiAm"} · ${panel.branding.tagline ?? ""}`],
+              ["Producto", [panel.branding.product ?? APP_NAME, panel.branding.tagline].filter(Boolean).join(" · ")],
               ["Zona horaria", panel.timezone],
               ["Embalses", data.sites.map((s) => s.name).join(", ")],
               [

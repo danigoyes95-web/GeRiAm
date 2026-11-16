@@ -2,20 +2,21 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers/Providers";
 import "./globals.css";
+import { APP_NAME, APP_SHORT_NAME } from "@/lib/brand";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "GeRiAm — Monitoreo y alerta temprana de embalses", template: "%s · GeRiAm" },
+  title: { default: APP_NAME, template: `%s · ${APP_SHORT_NAME}` },
   description: "Plataforma de monitoreo y alerta temprana de embalses. Gestión de Riesgos.",
-  applicationName: "GeRiAm",
+  applicationName: APP_NAME,
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
   },
-  appleWebApp: { capable: true, title: "GeRiAm", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: APP_SHORT_NAME, statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 

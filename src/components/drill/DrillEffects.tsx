@@ -356,7 +356,7 @@ const PROLOGUE = [
   {
     at: "T − 6 h",
     icon: Siren,
-    title: "GeRiAm en vigilancia reforzada",
+    title: "Sistema en vigilancia reforzada",
     text: "La sala de operaciones confirma el aviso y los técnicos de zona quedan notificados.",
   },
   {
