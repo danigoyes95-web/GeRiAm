@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SITES, buildCurve } from "@config/sites.tungurahua";
 import { siteParamsFromRow } from "@/lib/sim/params";
 import {
+  arrivalAt,
   breachHydrograph,
   computeImpact,
   hazardClass,
@@ -80,5 +81,20 @@ describe("impacto de la crecida", () => {
   it("antes de que se abra la brecha no hay agua en el valle", () => {
     const r = computeImpact(fd, [dam("CHQ", 25)], "agua", 20);
     expect(r.totals.areaHa).toBe(0);
+  });
+
+  it("el agua avanza con el frente: ningún tramo se moja antes de su tiempo de llegada", () => {
+    const d = dam("CHQ", 25);
+    for (const since of [5, 20, 45, 90]) {
+      const r = computeImpact(fd, [d], "lodo", 25 + since);
+      const km = meta.river.km.CHQ;
+      let wet = 0;
+      for (let i = 0; i < r.stage.length; i++) {
+        if (r.stage[i] <= 0 || km[i] < 0) continue;
+        wet++;
+        expect(arrivalAt(d.table, km[i])).toBeLessThanOrEqual(since + 1);
+      }
+      expect(wet).toBeGreaterThan(0);
+    }
   });
 });
